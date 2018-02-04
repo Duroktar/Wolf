@@ -12,6 +12,9 @@ import {
 
 const { spawn } = require("child_process");
 
+const cornflower = "#6495ed";
+const orange = "#ec8443";
+
 export function activate(context: vscode.ExtensionContext) {
   console.log("The Wolf is running");
 
@@ -41,7 +44,7 @@ export function activate(context: vscode.ExtensionContext) {
   const annotationDecoration: TextEditorDecorationType = vscode.window.createTextEditorDecorationType(
     {
       after: {
-        color: "#6495ed",
+        color: cornflower,
         margin: "0 0 0 3em",
         textDecoration: "none"
       }
@@ -54,10 +57,12 @@ export function activate(context: vscode.ExtensionContext) {
     }
 
     const script: TextDocument["fileName"] = activeEditor.document.fileName;
+    const script_dir = path.dirname(script);
 
-    let wolf_path = path.join(extPath, "scripts");
+    let wolf_path = path.join(extPath, "scripts/wolf.py");
+    console.log("SCRIPT_DIR:", script_dir);
 
-    let python = spawn("python", ["wolf.py", script], { cwd: wolf_path });
+    let python = spawn("python", [wolf_path, script], { cwd: script_dir });
 
     python.stderr.on("data", data => {
       console.error(`ERROR: ${data}`);
@@ -65,15 +70,15 @@ export function activate(context: vscode.ExtensionContext) {
     });
 
     python.stdout.on("data", data => {
-      const w_index = data.indexOf("WOLF:");
+      const w_index = data.indexOf("WOOF:");
       if (w_index === -1) {
         // XXX Need to do some error parsing
         return;
       }
       const decorations: vscode.DecorationOptions[] = [];
       const lines = JSON.parse(data.slice(w_index + 5));
-      console.log(`WOLF: ${data}`);
-      const seen = {};
+      console.log(`WOLF_DATA: ${data}`);
+      const annotations = {};
       lines.forEach(element => {
         let value;
         if (element.value && element.kind === "line") {
@@ -83,22 +88,26 @@ export function activate(context: vscode.ExtensionContext) {
             value = '"' + element.value + '"';
           } else if (typeof element.value === "number") {
             value = parseInt(element.value);
+          } else if (typeof element.value === "object") {
+            value = JSON.stringify(element.value);
+          } else {
+            value = `${element.value}`;
           }
           const currentLine = element.line_number - 1;
-          const wasSeen = seen[currentLine] || false;
+          const wasSeen = annotations[currentLine] || false;
           const results = wasSeen ? [...wasSeen, value] : value;
-          seen[currentLine] = [results];
+          annotations[currentLine] = [results];
         }
       });
-      Object.keys(seen).forEach(key => {
-        const element = seen[key];
+      Object.keys(annotations).forEach(key => {
+        const annotation = annotations[key];
         const currentLine = key;
         const line = activeEditor.document.lineAt(parseInt(currentLine, 10));
         const decoration = {
           range: line.range,
           renderOptions: {
             after: {
-              contentText: `${element}`,
+              contentText: `${annotation}`,
               fontWeight: "normal",
               fontStyle: "normal"
             }

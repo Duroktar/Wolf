@@ -7,12 +7,8 @@
   "engines": {
     "vscode": "^1.12.0"
   },
-  "categories": [
-    "Other"
-  ],
-  "activationEvents": [
-    "onCommand:wolf.barkAtCurrentFile"
-  ],
+  "categories": ["Other"],
+  "activationEvents": ["onCommand:wolf.barkAtCurrentFile"],
   "main": "./out/src/extension",
   "contributes": {
     "commands": [
@@ -21,6 +17,13 @@
         "title": "Set the Wolf on the current file."
       }
     ]
+  },
+  "repository": {
+    "url": "https://github.com/Duroktar/Wolf"
+  },
+  "icon": "icon.png",
+  "galleryBanner": {
+    "color": "#6495ed"
   },
   "build": {
     "extraResources": "scripts"

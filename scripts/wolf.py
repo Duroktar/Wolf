@@ -53,9 +53,22 @@ def import_file(full_name, fullpath):
     return mod
 
 
-def import_and_trace_script(module_name, fullpath):
-    with trace(filename_filter(fullpath), action=result_handler):
-        import_file(module_name, fullpath)
+class WithPath(object):
+
+    def __init__(self, path):
+        self.new_dir = path
+
+    def __enter__(self):
+        sys.path.insert(1, self.new_dir)
+
+    def __exit__(self, *args):
+        sys.path.remove(self.new_dir)
+
+
+def import_and_trace_script(module_name, module_path):
+    with WithPath(os.path.abspath(os.path.dirname(module_path))):
+        with trace(filename_filter(module_path), action=result_handler):
+            import_file(module_name, module_path)
 
 
 def main(filename):
@@ -64,11 +77,11 @@ def main(filename):
         print(filename + " <- file doesn't exist", file=sys.stderr)
         return 1
 
-    target = os.path.abspath(filename)
-    module_name = os.path.basename(target).split('.')[0]
+    module_path = os.path.abspath(filename)
+    module_name = os.path.basename(module_path).split('.')[0]
 
     try:
-        import_and_trace_script(module_name, target)
+        import_and_trace_script(module_name, module_path)
     except Exception as e:
         print('There was an error running the provided script..')
         print(e, file=sys.stderr)
@@ -78,7 +91,7 @@ def main(filename):
         python_data = ", ".join(json.dumps(i) for i in WOLF)
 
         # DO NOT TOUCH, ie: no pretty printing
-        print("WOLF: [" + python_data + "]")
+        print("WOOF: [" + python_data + "]")
         ###
         return 0
 
