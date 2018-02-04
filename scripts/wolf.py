@@ -5,7 +5,11 @@ import sys
 import json
 from importlib import util
 
-from hunter import trace, Q, wrap
+try:
+    from hunter import trace, Q, wrap
+except ImportError:
+    print('IMPORT_ERROR: hunter not installed.')
+    exit(1)
 from pdb import Pdb
 
 

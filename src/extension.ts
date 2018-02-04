@@ -15,17 +15,52 @@ const { spawn } = require("child_process");
 const cornflower = "#6495ed";
 const orange = "#ec8443";
 
+let activeSessions = {};
+
 export function activate(context: vscode.ExtensionContext) {
   console.log("The Wolf is running");
 
-  let activeEditor: TextEditor = vscode.window.activeTextEditor;
   let extPath: Extension<any>["extensionPath"] = vscode.extensions.getExtension(
     "traBpUkciP.wolf"
   ).extensionPath;
 
+  const disposable: Disposable = vscode.commands.registerCommand(
+    "wolf.barkAtCurrentFile",
+    () => {
+      let activeEditor: TextEditor = vscode.window.activeTextEditor;
+      let current = activeEditor.document.fileName;
+      activeSessions[path.basename(current)] = activeEditor;
+      updateDecorations();
+    }
+  );
+
+  const finishDisposable: Disposable = vscode.commands.registerCommand(
+    "wolf.stopBarking",
+    () => {
+      stopAllSessions();
+    }
+  );
+
+  vscode.window.onDidChangeActiveTextEditor(
+    event => {
+      console.log("CHANGING:", event.document.fileName);
+      let activeEditor: TextEditor = vscode.window.activeTextEditor;
+      if (
+        activeEditor &&
+        activeSessions[path.basename(event.document.fileName)]
+      ) {
+        triggerUpdateDecorations();
+      }
+    },
+    null,
+    context.subscriptions
+  );
+
   vscode.workspace.onDidSaveTextDocument(
     event => {
-      if (activeEditor && event.fileName === activeEditor.document.fileName) {
+      // if (activeEditor && event.fileName === activeEditor.document.fileName) {
+      let activeEditor: TextEditor = vscode.window.activeTextEditor;
+      if (activeEditor && activeSessions[path.basename(event.fileName)]) {
         triggerUpdateDecorations();
       }
     },
@@ -41,6 +76,21 @@ export function activate(context: vscode.ExtensionContext) {
     timeout = setTimeout(updateDecorations, 500);
   }
 
+  function stopCurrentSession() {
+    let activeEditor: TextEditor = vscode.window.activeTextEditor;
+    let current = activeEditor.document.fileName;
+    activeEditor.setDecorations(annotationDecoration, []);
+    activeSessions[path.basename(current)] = undefined;
+  }
+
+  function stopAllSessions() {
+    let activeEditor: TextEditor = vscode.window.activeTextEditor;
+    for (let e of Object.keys(activeSessions)) {
+      activeSessions[e].setDecorations(annotationDecoration, []);
+    }
+    activeSessions = {};
+  }
+
   const annotationDecoration: TextEditorDecorationType = vscode.window.createTextEditorDecorationType(
     {
       after: {
@@ -52,77 +102,81 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   function updateDecorations() {
+    let activeEditor: TextEditor = vscode.window.activeTextEditor;
     if (!activeEditor) {
       return;
     }
+    try {
+      const script: TextDocument["fileName"] = activeEditor.document.fileName;
+      const script_dir = path.dirname(script);
 
-    const script: TextDocument["fileName"] = activeEditor.document.fileName;
-    const script_dir = path.dirname(script);
+      let wolf_path = path.join(extPath, "scripts/wolf.py");
 
-    let wolf_path = path.join(extPath, "scripts/wolf.py");
-    console.log("SCRIPT_DIR:", script_dir);
+      let python = spawn("python", [wolf_path, script], { cwd: script_dir });
 
-    let python = spawn("python", [wolf_path, script], { cwd: script_dir });
-
-    python.stderr.on("data", data => {
-      console.error(`ERROR: ${data}`);
-      console.error(`ERROR MESSAGE: ${data.message}`);
-    });
-
-    python.stdout.on("data", data => {
-      const w_index = data.indexOf("WOOF:");
-      if (w_index === -1) {
-        // XXX Need to do some error parsing
-        return;
-      }
-      const decorations: vscode.DecorationOptions[] = [];
-      const lines = JSON.parse(data.slice(w_index + 5));
-      console.log(`WOLF_DATA: ${data}`);
-      const annotations = {};
-      lines.forEach(element => {
-        let value;
-        if (element.value && element.kind === "line") {
-          if (Array.isArray(element.value)) {
-            value = "[" + element.value + "]";
-          } else if (typeof element.value === "string") {
-            value = '"' + element.value + '"';
-          } else if (typeof element.value === "number") {
-            value = parseInt(element.value);
-          } else if (typeof element.value === "object") {
-            value = JSON.stringify(element.value);
-          } else {
-            value = `${element.value}`;
-          }
-          const currentLine = element.line_number - 1;
-          const wasSeen = annotations[currentLine] || false;
-          const results = wasSeen ? [...wasSeen, value] : value;
-          annotations[currentLine] = [results];
+      python.stderr.on("data", data => {
+        if (data.includes("IMPORT_ERROR")) {
+          vscode.window.showInformationMessage(
+            "Wolf requires the hunter package. Please run 'pip install hunter --user' and try again."
+          );
         }
-      });
-      Object.keys(annotations).forEach(key => {
-        const annotation = annotations[key];
-        const currentLine = key;
-        const line = activeEditor.document.lineAt(parseInt(currentLine, 10));
-        const decoration = {
-          range: line.range,
-          renderOptions: {
-            after: {
-              contentText: `${annotation}`,
-              fontWeight: "normal",
-              fontStyle: "normal"
-            }
-          } as DecorationRenderOptions
-        } as DecorationOptions;
-        decorations.push(decoration);
+        console.error(`ERROR: ${data}`);
+        console.error(`ERROR MESSAGE: ${data.message}`);
       });
 
-      activeEditor.setDecorations(annotationDecoration, decorations);
-    });
+      python.stdout.on("data", data => {
+        const w_index = data.indexOf("WOOF:");
+        if (w_index === -1) {
+          return;
+        }
+        const decorations: vscode.DecorationOptions[] = [];
+        const lines = JSON.parse(data.slice(w_index + 5));
+        console.log(`WOLF_DATA: ${data}`);
+        const annotations = {};
+        lines.forEach(element => {
+          let value;
+          if (element.value && element.kind === "line") {
+            if (Array.isArray(element.value)) {
+              value = "[" + element.value + "]";
+            } else if (typeof element.value === "string") {
+              value = '"' + element.value + '"';
+            } else if (typeof element.value === "number") {
+              value = parseInt(element.value);
+            } else if (typeof element.value === "object") {
+              value = JSON.stringify(element.value);
+            } else {
+              value = `${element.value}`;
+            }
+            const currentLine = element.line_number - 1;
+            const wasSeen = annotations[currentLine] || false;
+            const results = wasSeen ? [...wasSeen, value] : value;
+            annotations[currentLine] = [results];
+          }
+        });
+        Object.keys(annotations).forEach(key => {
+          const annotation = annotations[key];
+          const currentLine = key;
+          const line = activeEditor.document.lineAt(parseInt(currentLine, 10));
+          const decoration = {
+            range: line.range,
+            renderOptions: {
+              after: {
+                contentText: `${annotation}`,
+                fontWeight: "normal",
+                fontStyle: "normal"
+              }
+            } as DecorationRenderOptions
+          } as DecorationOptions;
+          decorations.push(decoration);
+        });
+
+        activeEditor.setDecorations(annotationDecoration, decorations);
+      });
+    } catch (err) {
+      console.log("ERROR:", err.message);
+      console.error(err);
+    }
   }
-  const disposable: Disposable = vscode.commands.registerCommand(
-    "wolf.barkAtCurrentFile",
-    () => updateDecorations()
-  );
 
   context.subscriptions.push(disposable);
 }

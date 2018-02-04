@@ -15,6 +15,10 @@
       {
         "command": "wolf.barkAtCurrentFile",
         "title": "Set the Wolf on the current file."
+      },
+      {
+        "command": "wolf.stopBarking",
+        "title": "Stops all running Wolf sessions."
       }
     ]
   },
