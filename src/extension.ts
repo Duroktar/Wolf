@@ -13,13 +13,10 @@ import {
 const { spawn } = require("child_process");
 
 const cornflower = "#6495ed";
-const orange = "#ec8443";
 
 let activeSessions = {};
 
 export function activate(context: vscode.ExtensionContext) {
-  console.log("The Wolf is running");
-
   let extPath: Extension<any>["extensionPath"] = vscode.extensions.getExtension(
     "traBpUkciP.wolf"
   ).extensionPath;
@@ -43,7 +40,6 @@ export function activate(context: vscode.ExtensionContext) {
 
   vscode.window.onDidChangeActiveTextEditor(
     event => {
-      console.log("CHANGING:", event.document.fileName);
       let activeEditor: TextEditor = vscode.window.activeTextEditor;
       if (
         activeEditor &&
@@ -58,7 +54,6 @@ export function activate(context: vscode.ExtensionContext) {
 
   vscode.workspace.onDidSaveTextDocument(
     event => {
-      // if (activeEditor && event.fileName === activeEditor.document.fileName) {
       let activeEditor: TextEditor = vscode.window.activeTextEditor;
       if (activeEditor && activeSessions[path.basename(event.fileName)]) {
         triggerUpdateDecorations();
@@ -107,7 +102,7 @@ export function activate(context: vscode.ExtensionContext) {
       return;
     }
     try {
-      const script: TextDocument["fileName"] = activeEditor.document.fileName;
+      const script = activeEditor.document.fileName;
       const script_dir = path.dirname(script);
 
       let wolf_path = path.join(extPath, "scripts/wolf.py");
@@ -131,7 +126,7 @@ export function activate(context: vscode.ExtensionContext) {
         }
         const decorations: vscode.DecorationOptions[] = [];
         const lines = JSON.parse(data.slice(w_index + 5));
-        console.log(`WOLF_DATA: ${data}`);
+        console.log(`WOLF_DATA:`, JSON.stringify(data));
         const annotations = {};
         lines.forEach(element => {
           let value;
@@ -155,8 +150,7 @@ export function activate(context: vscode.ExtensionContext) {
         });
         Object.keys(annotations).forEach(key => {
           const annotation = annotations[key];
-          const currentLine = key;
-          const line = activeEditor.document.lineAt(parseInt(currentLine, 10));
+          const line = activeEditor.document.lineAt(parseInt(key, 10));
           const decoration = {
             range: line.range,
             renderOptions: {
@@ -167,13 +161,14 @@ export function activate(context: vscode.ExtensionContext) {
               }
             } as DecorationRenderOptions
           } as DecorationOptions;
+
           decorations.push(decoration);
         });
 
         activeEditor.setDecorations(annotationDecoration, decorations);
       });
     } catch (err) {
-      console.log("ERROR:", err.message);
+      console.log('ERROR in "updateDecorations" -> ', err.message);
       console.error(err);
     }
   }

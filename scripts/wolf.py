@@ -57,7 +57,7 @@ def import_file(full_name, fullpath):
     return mod
 
 
-class WithPath(object):
+class WithPath:
 
     def __init__(self, path):
         self.new_dir = path
