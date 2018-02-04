@@ -7,16 +7,18 @@ import {
   TextEditor,
   Extension,
   TextEditorDecorationType,
-  Disposable
+  Disposable,
+  MessageItem
 } from "vscode";
 
-const { spawn } = require("child_process");
+const { spawn, spawnSync } = require("child_process");
 
 const cornflower = "#6495ed";
 
 let activeSessions = {};
 
 export function activate(context: vscode.ExtensionContext) {
+  console.log('Initializing Wolf');
   let extPath: Extension<any>["extensionPath"] = vscode.extensions.getExtension(
     "traBpUkciP.wolf"
   ).extensionPath;
@@ -27,6 +29,7 @@ export function activate(context: vscode.ExtensionContext) {
       let activeEditor: TextEditor = vscode.window.activeTextEditor;
       let current = activeEditor.document.fileName;
       activeSessions[path.basename(current)] = activeEditor;
+      console.log('STARTING ON NEW FILE');
       updateDecorations();
     }
   );
@@ -104,19 +107,36 @@ export function activate(context: vscode.ExtensionContext) {
     try {
       const script = activeEditor.document.fileName;
       const script_dir = path.dirname(script);
-
+      
       let wolf_path = path.join(extPath, "scripts/wolf.py");
-
+      
       let python = spawn("python", [wolf_path, script], { cwd: script_dir });
 
       python.stderr.on("data", data => {
         if (data.includes("IMPORT_ERROR")) {
+          const installHunter: MessageItem = { title: "Install Package" };
           vscode.window.showInformationMessage(
-            "Wolf requires the hunter package. Please run 'pip install hunter --user' and try again."
-          );
+            "Wolf requires the hunter package. Install now or run 'pip install hunter --user' manually.",
+            installHunter
+          ).then(result => {
+            if (result === installHunter) {
+              let child = spawn('pip', ['install', 'hunter', '--user'], { cwd: script_dir })
+              child.stderr.on('data', data => console.error("ERROR:", data + ""))
+              child.on('close', code => {
+                if (code !== 0) {
+                  vscode.window.showWarningMessage([
+                    "There was an error attempting to install hunter. Please try running",
+                    "'pip install hunter --user' manually."
+                  ].join(' '))
+                } else {
+                  vscode.window.showInformationMessage('Hunter installed successfully. Re-running Wolf..')
+                  triggerUpdateDecorations();
+                }
+              })
+            }
+          })
         }
         console.error(`ERROR: ${data}`);
-        console.error(`ERROR MESSAGE: ${data.message}`);
       });
 
       python.stdout.on("data", data => {
@@ -124,9 +144,15 @@ export function activate(context: vscode.ExtensionContext) {
         if (w_index === -1) {
           return;
         }
+        console.log(`${data}`);
         const decorations: vscode.DecorationOptions[] = [];
-        const lines = JSON.parse(data.slice(w_index + 5));
-        console.log(`WOLF_DATA:`, JSON.stringify(data));
+        let lines
+        try {
+          lines = JSON.parse(data.slice(w_index + 5));
+        } catch(err) {
+          console.error('JSON PARSE ERROR.');
+          return;
+        }
         const annotations = {};
         lines.forEach(element => {
           let value;
@@ -174,4 +200,5 @@ export function activate(context: vscode.ExtensionContext) {
   }
 
   context.subscriptions.push(disposable);
+  context.subscriptions.push(finishDisposable);
 }

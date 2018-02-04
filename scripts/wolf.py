@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 import os
 import sys
 import json
@@ -8,7 +6,7 @@ from importlib import util
 try:
     from hunter import trace, Q, wrap
 except ImportError:
-    print('IMPORT_ERROR: hunter not installed.')
+    print('IMPORT_ERROR: hunter not installed.', file=sys.stderr)
     exit(1)
 from pdb import Pdb
 
