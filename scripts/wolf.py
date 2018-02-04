@@ -3,8 +3,9 @@
 import os
 import sys
 import json
-from importlib import import_module
-from hunter import trace, Q
+from importlib import util
+
+from hunter import trace, Q, wrap
 from pdb import Pdb
 
 
@@ -31,52 +32,62 @@ def result_handler(event):
         env = {**event['globals'], **event['locals']}
         value = env.get(firstFrom(parts))
         if value:
-            rv['value'] = value
+            if callable(value):
+                rv['value'] = str(value)
+            else:
+                rv['value'] = value
     WOLF.append(rv)
 
 
 def filename_filter(filename):
     def inner(event):
-        rel_path = os.path.relpath(event['filename'])
-        rel_target = os.path.relpath(filename)
-        return True if rel_path == rel_target else False
+        target_filename = event['filename']
+        return True if target_filename == filename else False
     return inner
 
 
-def setTrace(target_file):
-    trace(
-        Q(
-            filename_filter(target_file),
-            kind="line",
-            stdlib=False,
-            action=result_handler)
-    )
+def import_file(full_name, fullpath):
+    spec = util.spec_from_file_location(full_name, fullpath)
+    mod = util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
 
 
-def main(argv):
-    if len(argv) < 2:
-        print("Must provide a file.")
-        return 1
-    filename = argv[1]
+def import_and_trace_script(module_name, fullpath):
+    with trace(filename_filter(fullpath), action=result_handler):
+        import_file(module_name, fullpath)
+
+
+def main(filename):
+
     if not os.path.exists(filename):
-        print(filename + " <- doesn't exist")
+        print(filename + " <- file doesn't exist", file=sys.stderr)
         return 1
 
     target = os.path.abspath(filename)
     module_name = os.path.basename(target).split('.')[0]
 
-    # XXX Could probably do some error checking here..
-    setTrace(target)
-    script = import_module(module_name)
-    ###
+    try:
+        import_and_trace_script(module_name, target)
+    except Exception as e:
+        print('There was an error running the provided script..')
+        print(e, file=sys.stderr)
+        return 1
 
     if WOLF:
         python_data = ", ".join(json.dumps(i) for i in WOLF)
+
+        # DO NOT TOUCH, ie: no pretty printing
         print("WOLF: [" + python_data + "]")
+        ###
         return 0
-    else:
-        return 1
+
+    return 1
 
 
 if __name__ == '__main__':
-    exit(main(sys.argv))
+    if len(sys.argv) < 2:
+        print("wolf.py >> ERROR >> Must provide a file to trace.")
+        exit(1)
+
+    exit(main(sys.argv[1]))

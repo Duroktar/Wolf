@@ -1,87 +1,119 @@
-import * as vscode from 'vscode';
+import * as vscode from "vscode";
+import * as path from "path";
+import {
+  DecorationOptions,
+  DecorationRenderOptions,
+  TextDocument,
+  TextEditor,
+  Extension,
+  TextEditorDecorationType,
+  Disposable
+} from "vscode";
 
-const PYTHON: vscode.DocumentFilter = { language: 'python' };
+const { spawn } = require("child_process");
 
-// this method is called when vs code is activated
 export function activate(context: vscode.ExtensionContext) {
+  console.log("The Wolf is running");
 
-    console.log('decorator sample is activated');
+  let activeEditor: TextEditor = vscode.window.activeTextEditor;
+  let extPath: Extension<any>["extensionPath"] = vscode.extensions.getExtension(
+    "traBpUkciP.wolf"
+  ).extensionPath;
 
-    let activeEditor = vscode.window.activeTextEditor;
+  vscode.workspace.onDidSaveTextDocument(
+    event => {
+      if (activeEditor && event.fileName === activeEditor.document.fileName) {
+        triggerUpdateDecorations();
+      }
+    },
+    null,
+    context.subscriptions
+  );
 
-    // create a decorator type that we use to decorate small numbers
-    const smallNumberDecorationType = vscode.window.createTextEditorDecorationType({
-        borderWidth: '1px',
-        borderStyle: 'solid',
-        overviewRulerColor: 'blue',
-        overviewRulerLane: vscode.OverviewRulerLane.Right,
-        light: {
-            // this color will be used in light color themes
-            borderColor: 'darkblue'
-        },
-        dark: {
-            // this color will be used in dark color themes
-            borderColor: 'lightblue'
-        }
-    });
+  var timeout = null;
+  function triggerUpdateDecorations() {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+    timeout = setTimeout(updateDecorations, 500);
+  }
 
-    // create a decorator type that we use to decorate large numbers
-    const largeNumberDecorationType = vscode.window.createTextEditorDecorationType({
-        cursor: 'crosshair',
-        backgroundColor: 'rgba(255,0,0,0.3)'
-    });
+  const annotationDecoration: TextEditorDecorationType = vscode.window.createTextEditorDecorationType(
+    {
+      after: {
+        color: "#6495ed",
+        margin: "0 0 0 3em",
+        textDecoration: "none"
+      }
+    } as DecorationRenderOptions
+  );
 
-    // if (activeEditor) {
-    //     triggerUpdateDecorations();
-    // }
-
-    // vscode.window.onDidChangeActiveTextEditor(editor => {
-    //     activeEditor = editor;
-    //     if (editor) {
-    //         triggerUpdateDecorations();
-    //     }
-    // }, null, context.subscriptions);
-
-    vscode.workspace.onDidSaveTextDocument(event => {
-        if (activeEditor && event.fileName === activeEditor.document.fileName) {
-            triggerUpdateDecorations();
-        }
-    }, null, context.subscriptions);
-
-    var timeout = null;
-    function triggerUpdateDecorations() {
-        if (timeout) {
-            clearTimeout(timeout);
-        }
-        timeout = setTimeout(updateDecorations, 500);
+  function updateDecorations() {
+    if (!activeEditor) {
+      return;
     }
 
-    function updateDecorations() {
-        if (!activeEditor) {
-            return;
+    const script: TextDocument["fileName"] = activeEditor.document.fileName;
+
+    let wolf_path = path.join(extPath, "scripts");
+
+    let python = spawn("python", ["wolf.py", script], { cwd: wolf_path });
+
+    python.stderr.on("data", data => {
+      console.error(`ERROR: ${data}`);
+      console.error(`ERROR MESSAGE: ${data.message}`);
+    });
+
+    python.stdout.on("data", data => {
+      const w_index = data.indexOf("WOLF:");
+      if (w_index === -1) {
+        // XXX Need to do some error parsing
+        return;
+      }
+      const decorations: vscode.DecorationOptions[] = [];
+      const lines = JSON.parse(data.slice(w_index + 5));
+      console.log(`WOLF: ${data}`);
+      const seen = {};
+      lines.forEach(element => {
+        let value;
+        if (element.value && element.kind === "line") {
+          if (Array.isArray(element.value)) {
+            value = "[" + element.value + "]";
+          } else if (typeof element.value === "string") {
+            value = '"' + element.value + '"';
+          } else if (typeof element.value === "number") {
+            value = parseInt(element.value);
+          }
+          const currentLine = element.line_number - 1;
+          const wasSeen = seen[currentLine] || false;
+          const results = wasSeen ? [...wasSeen, value] : value;
+          seen[currentLine] = [results];
         }
-        const regEx = /\d+/g;
-        const text = activeEditor.document.getText();
-        const smallNumbers: vscode.DecorationOptions[] = [];
-        const largeNumbers: vscode.DecorationOptions[] = [];
-        let match;
-        while (match = regEx.exec(text)) {
-            const startPos = activeEditor.document.positionAt(match.index);
-            const endPos = activeEditor.document.positionAt(match.index + match[0].length);
-            const decoration = { range: new vscode.Range(startPos, endPos), hoverMessage: 'Number **' + match[0] + '**' };
-            if (match[0].length < 3) {
-                smallNumbers.push(decoration);
-            } else {
-                largeNumbers.push(decoration);
+      });
+      Object.keys(seen).forEach(key => {
+        const element = seen[key];
+        const currentLine = key;
+        const line = activeEditor.document.lineAt(parseInt(currentLine, 10));
+        const decoration = {
+          range: line.range,
+          renderOptions: {
+            after: {
+              contentText: `${element}`,
+              fontWeight: "normal",
+              fontStyle: "normal"
             }
-        }
-        activeEditor.setDecorations(smallNumberDecorationType, smallNumbers);
-        activeEditor.setDecorations(largeNumberDecorationType, largeNumbers);
-    }
-    let disposable = vscode.commands.registerCommand('extension.barkAtCurrentFile', () => {
-        return
+          } as DecorationRenderOptions
+        } as DecorationOptions;
+        decorations.push(decoration);
+      });
+
+      activeEditor.setDecorations(annotationDecoration, decorations);
     });
+  }
+  const disposable: Disposable = vscode.commands.registerCommand(
+    "wolf.barkAtCurrentFile",
+    () => updateDecorations()
+  );
 
-    context.subscriptions.push(disposable);
-
+  context.subscriptions.push(disposable);
 }
