@@ -8,22 +8,18 @@
   "engines": {
     "vscode": "^1.12.0"
   },
-  "categories": [
-    "Other"
-  ],
-  "activationEvents": [
-    "onCommand:wolf.barkAtCurrentFile"
-  ],
+  "categories": ["Other"],
+  "activationEvents": ["onCommand:wolf.barkAtCurrentFile"],
   "main": "./out/src/extension",
   "contributes": {
     "commands": [
       {
         "command": "wolf.barkAtCurrentFile",
-        "title": "Set the Wolf on the current file."
+        "title": "Wolf: Set the Wolf on the current file."
       },
       {
         "command": "wolf.stopBarking",
-        "title": "Stops all running Wolf sessions."
+        "title": "Wolf: Stops all running Wolf sessions."
       }
     ]
   },

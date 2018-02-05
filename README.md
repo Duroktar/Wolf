@@ -1,65 +1,154 @@
-# wolf README
+# Wolf - It kicks the Quokkas ass
 
-This is the README for your extension "wolf". After writing up a brief description, we recommend including the following sections.
+Wolf is a VsCode extension that enables live inspection of Python code in the editor.
+
+Wolf is Good for:
+
+* Teachers
+* Students
+* Kids Who love to Code
+* API testers
+* Code Streamers
+* Planet Earth
+
+## Usage
+
+Press `F1`, type `wolf`, and select `Wolf: Set the wolf on the current file.`
+
+> PROTIP: Code annotations are updated on file save.
+
+When done, press `F1` again, type wolf and select `Wolf: Stop all running wolves.`
 
 ## Features
 
-Describe specific features of your extension including screenshots of your extension in action. Image paths are relative to this README file.
+**Check out variables inline!**
 
-For example if there is an image subfolder under your extension project workspace:
+![basic-example](images/basic_example.png)
 
-\!\[feature X\]\(images/feature-x.png\)
+> NOTE: For this to work you must put only the variable
+> name and not an expression; the annotations (16)
+> cannot be edited.
 
-> Tip: Many popular extensions utilize animations. This is an excellent way to show off your extension! We recommend short, focused animations that are easy to follow.
+**Track variables inside of functions!**
+
+![functions-example](images/functions_example.png)
+
+**Works with loops!**
+
+![loops-example](images/loops_example.png)
+
+**And recursion!**
+
+![recursion-example](images/recursion_example.png)
+
+> NOTE: There are limits, for example this will not respond when `n > 10`
+> on my PC, unless cached.
+
+**Works with Requests!**
+
+![requests-example](images/requests_example.png)
 
 ## Requirements
 
-If you have any requirements or dependencies, add a section describing those and how to install and configure them.
+* Python 3.6 <- This is currently a hard requirement
+* `Hunter` library, available on
+  PyPi.
+
+> NOTE: If hunter is not found, you will be given the option to
+> have it installed into to the "--user" directory automatically.
+>
+> ie: Wolf will perform `pip install hunter --user` in the cwd of
+> the script.
 
 ## Extension Settings
 
-Include if your extension adds any VS Code settings through the `contributes.configuration` extension point.
-
-For example:
-
 This extension contributes the following settings:
 
-* `myExtension.enable`: enable/disable this extension
-* `myExtension.thing`: set to `blah` to do something
+* `wolf.barkAtCurrentFile`: Starts Wolf on the current file.
+* `wolf.stopBarking`: Stops all running Wolf sessions.
 
-## Known Issues
+## FAQ
 
-Calling out known issues can help limit users opening duplicate issues against your extension.
+**Can I have the text annotations in cornflower blue?**
 
-## Release Notes
+Abso-fucking-lutely.
 
-Users appreciate release notes as you update your extension.
+**I don't see any annotations..**
 
-### 1.0.0
+Make sure to save the file you're working on, and that Wolf is activated.
+You can try stopping and starting Wolf again on the file to see if this
+helps.
 
-Initial release of ...
+**The annotations are everywhere**
 
-### 1.0.1
+Sorry, it's a feature for now. Try stopping and starting Wolf
+from the command menu to clear the pesky buggers.
 
-Fixed issue #.
+**Can my script have relative imports?**
 
-### 1.1.0
+Yes. Sorry, I mean, HELL YES!
 
-Added features X, Y, and Z.
+**Will APIs Hate Me?**
 
------------------------------------------------------------------------------------------------------------
+That depends. If you code reponsibly and use something like
+diskcache or redis to cache your calls, then you'll do just
+fine out there. But if you decide to just bang away at some
+API without some other sort of caching in place, then it's on
+you my friend. Having said that, Wolf will only actually run
+your code _on document save_. So you do get a small amount of
+throttling by default.
 
-## Working with Markdown
+Here's an example using [diskcache](https://pypi.python.org/pypi/diskcache/):
+![diskcache-example](images/diskcache_example.png)
 
-**Note:** You can author your README using Visual Studio Code.  Here are some useful editor keyboard shortcuts:
+**Do you hate Quokka?**
 
-* Split the editor (`Cmd+\` on OSX or `Ctrl+\` on Windows and Linux)
-* Toggle preview (`Shift+CMD+V` on OSX or `Shift+Ctrl+V` on Windows and Linux)
-* Press `Ctrl+Space` (Windows, Linux) or `Cmd+Space` (OSX) to see a list of Markdown snippets
+No, I love it. I set out to learn how to decorate text in vscode
+and was looking for inspiration, I use Quokka all the time while
+hacking away in JS land, and just really missed it when it came
+to Python. So I set to work on a simple POC and initially thought
+that I would hit a wall very quickly when it came to anything
+more than simple regex based stuff in the global scope of the
+script. I stumbled upon Hunter almost by accident (Back button
+was blurred, so I must have opened it in a new tab.. Probably
+reddit), there it was on PyPi with a screenshot _doing exactly
+what I needed_. I spent a day on it tops so far and here we are
+now. So, again, NO I love Quokka, and recommend it to everyone
+using Javascript. But at the end of the day, the Wolf eats the Quokka.. likely for breakfast. ;)
 
-### For more information
+**Wolf is stupid.. PDB is better**
 
-* [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
-* [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
+![pdb](https://memecreator.org/static/images/memes/4713467.jpg)
 
-**Enjoy!**
+\*Cue Jingle
+
+Honestly tho, if you need a real debugger, the one builtin to VSCode is
+about as good as it gets. So, really, please use that (or `pdb`, `ipdb`)
+if you're in need of stuff like breakpoints (or if lives depend on it, ie
+please don't use this to debug something like a drug pump ffs, ty).
+
+I see Wolf as more of an exploration tool, or for teachers and students
+in a learning environment, and definitely for streamers that teach Python
+in videos. You can't get any better than _live feedback next to the code you're editing_!
+
+---
+
+##I found a bug##
+
+You mean a flea? Report any fleas in the issue tracker, please!
+
+## Can I help
+
+That would be awesome. You can shoot me an email or submit a PR. I'm also on
+reddit `/u/Duroktar`. Also, there's plenty of documentation to get started
+on your own, if you just want to do that. Welcome one, welcome all!
+
+## License
+
+Wolf source is available under the Apache 2.0 Software license.
+Any dependant libraries are subject to their own licenses and
+terms, the most direct of which are listed below.
+
+## Third Party Libraries
+
+[Hunter](https://github.com/ionelmc/python-hunter) - Hunter is a flexible code tracing toolkit. (Honestly, I couldn't have made Wolf without this library.) - [BSD License](https://github.com/ionelmc/python-hunter/blob/master/LICENSE)

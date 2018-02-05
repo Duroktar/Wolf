@@ -18,32 +18,42 @@ const cornflower = "#6495ed";
 let activeSessions = {};
 
 export function activate(context: vscode.ExtensionContext) {
-  console.log('Initializing Wolf');
-  let extPath: Extension<any>["extensionPath"] = vscode.extensions.getExtension(
-    "traBpUkciP.wolf"
-  ).extensionPath;
+  const annotationDecoration: TextEditorDecorationType = vscode.window.createTextEditorDecorationType(
+    {
+      after: {
+        color: cornflower,
+        margin: "0 0 0 3em",
+        textDecoration: "none"
+      }
+    } as DecorationRenderOptions
+  );
 
-  const disposable: Disposable = vscode.commands.registerCommand(
+  const extPath = vscode.extensions.getExtension("traBpUkciP.wolf")
+    .extensionPath;
+
+  const wolfStartCommand: Disposable = vscode.commands.registerCommand(
     "wolf.barkAtCurrentFile",
     () => {
-      let activeEditor: TextEditor = vscode.window.activeTextEditor;
-      let current = activeEditor.document.fileName;
+      const activeEditor: TextEditor = vscode.window.activeTextEditor;
+      const current = activeEditor.document.fileName;
       activeSessions[path.basename(current)] = activeEditor;
-      console.log('STARTING ON NEW FILE');
-      updateDecorations();
+      triggerUpdateDecorations();
     }
   );
 
-  const finishDisposable: Disposable = vscode.commands.registerCommand(
+  const wolfStopCommand: Disposable = vscode.commands.registerCommand(
     "wolf.stopBarking",
     () => {
       stopAllSessions();
     }
   );
 
+  context.subscriptions.push(wolfStartCommand);
+  context.subscriptions.push(wolfStopCommand);
+
   vscode.window.onDidChangeActiveTextEditor(
     event => {
-      let activeEditor: TextEditor = vscode.window.activeTextEditor;
+      const activeEditor: TextEditor = vscode.window.activeTextEditor;
       if (
         activeEditor &&
         activeSessions[path.basename(event.document.fileName)]
@@ -57,7 +67,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   vscode.workspace.onDidSaveTextDocument(
     event => {
-      let activeEditor: TextEditor = vscode.window.activeTextEditor;
+      const activeEditor: TextEditor = vscode.window.activeTextEditor;
       if (activeEditor && activeSessions[path.basename(event.fileName)]) {
         triggerUpdateDecorations();
       }
@@ -66,7 +76,7 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions
   );
 
-  var timeout = null;
+  let timeout = null;
   function triggerUpdateDecorations() {
     if (timeout) {
       clearTimeout(timeout);
@@ -75,85 +85,101 @@ export function activate(context: vscode.ExtensionContext) {
   }
 
   function stopCurrentSession() {
-    let activeEditor: TextEditor = vscode.window.activeTextEditor;
-    let current = activeEditor.document.fileName;
+    const activeEditor: TextEditor = vscode.window.activeTextEditor;
+    const current = activeEditor.document.fileName;
     activeEditor.setDecorations(annotationDecoration, []);
     activeSessions[path.basename(current)] = undefined;
   }
 
   function stopAllSessions() {
-    let activeEditor: TextEditor = vscode.window.activeTextEditor;
+    const activeEditor: TextEditor = vscode.window.activeTextEditor;
     for (let e of Object.keys(activeSessions)) {
       activeSessions[e].setDecorations(annotationDecoration, []);
     }
     activeSessions = {};
   }
 
-  const annotationDecoration: TextEditorDecorationType = vscode.window.createTextEditorDecorationType(
-    {
-      after: {
-        color: cornflower,
-        margin: "0 0 0 3em",
-        textDecoration: "none"
-      }
-    } as DecorationRenderOptions
-  );
-
   function updateDecorations() {
-    let activeEditor: TextEditor = vscode.window.activeTextEditor;
+    const activeEditor: TextEditor = vscode.window.activeTextEditor;
     if (!activeEditor) {
       return;
     }
     try {
       const script = activeEditor.document.fileName;
       const script_dir = path.dirname(script);
-      
-      let wolf_path = path.join(extPath, "scripts/wolf.py");
-      
-      let python = spawn("python", [wolf_path, script], { cwd: script_dir });
+
+      const wolf_path = path.join(extPath, "scripts/wolf.py");
+
+      const python = spawn("python", [wolf_path, script], { cwd: script_dir });
 
       python.stderr.on("data", data => {
+        // TODO: Check for other error TAGS (see: `scripts/wolf.py` in main function)
         if (data.includes("IMPORT_ERROR")) {
+          // This means the 'hunter' package is not installed .. Notify
+          // and offer to install for user automatically.
           const installHunter: MessageItem = { title: "Install Package" };
-          vscode.window.showInformationMessage(
-            "Wolf requires the hunter package. Install now or run 'pip install hunter --user' manually.",
-            installHunter
-          ).then(result => {
-            if (result === installHunter) {
-              let child = spawn('pip', ['install', 'hunter', '--user'], { cwd: script_dir })
-              child.stderr.on('data', data => console.error("ERROR:", data + ""))
-              child.on('close', code => {
-                if (code !== 0) {
-                  vscode.window.showWarningMessage([
-                    "There was an error attempting to install hunter. Please try running",
-                    "'pip install hunter --user' manually."
-                  ].join(' '))
-                } else {
-                  vscode.window.showInformationMessage('Hunter installed successfully. Re-running Wolf..')
-                  triggerUpdateDecorations();
-                }
-              })
-            }
-          })
+          vscode.window
+            .showInformationMessage(
+              "Wolf requires the hunter package. Install now or run 'pip install hunter --user' manually.",
+              installHunter
+            )
+            .then(result => {
+              if (result === installHunter) {
+                const child = spawn("pip", ["install", "hunter", "--user"], {
+                  cwd: script_dir
+                });
+                child.stderr.on("data", data =>
+                  console.error("ERROR:", data + "")
+                );
+                child.on("close", code => {
+                  if (code !== 0) {
+                    vscode.window.showWarningMessage(
+                      [
+                        "There was an error attempting to install hunter. Please try running",
+                        "'pip install hunter --user' manually."
+                      ].join(" ")
+                    );
+                  } else {
+                    vscode.window.showInformationMessage(
+                      "Hunter installed successfully. Re-running Wolf.."
+                    );
+                    triggerUpdateDecorations();
+                  }
+                });
+              }
+            });
         }
         console.error(`ERROR: ${data}`);
       });
 
       python.stdout.on("data", data => {
+        // The script didn't return an error code, let's
+        // parse the data..
         const w_index = data.indexOf("WOOF:");
         if (w_index === -1) {
+          // Nothing, maybe an new file ..
           return;
         }
+
+        // TODO: Create a Wolf "OUTPUT" window
         console.log(`${data}`);
-        const decorations: vscode.DecorationOptions[] = [];
-        let lines
+
+        // ---------
+
+        let lines;
         try {
+          // slice from the `WOLF:` tag (index + 5)
           lines = JSON.parse(data.slice(w_index + 5));
-        } catch(err) {
-          console.error('JSON PARSE ERROR.');
+        } catch (err) {
+          console.error("ERROR_LINES:", lines);
+          console.error("JSON PARSE ERROR.");
           return;
         }
+
+        const decorations: vscode.DecorationOptions[] = [];
         const annotations = {};
+        // This is where we determine how each type will be
+        // represented in the decoration.
         lines.forEach(element => {
           let value;
           if (element.value && element.kind === "line") {
@@ -198,7 +224,4 @@ export function activate(context: vscode.ExtensionContext) {
       console.error(err);
     }
   }
-
-  context.subscriptions.push(disposable);
-  context.subscriptions.push(finishDisposable);
 }
