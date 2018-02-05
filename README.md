@@ -140,7 +140,7 @@ You mean a flea? Report any fleas in the issue tracker, please!
 ## Can I help
 
 That would be awesome. You can shoot me an email or submit a PR. I'm also on
-reddit `/u/Duroktar`. Also, there's plenty of documentation to get started
+reddit at `/u/Duroktar`. Also, there's plenty of documentation to get started
 on your own, if you just want to do that. Welcome one, welcome all!
 
 ## License
