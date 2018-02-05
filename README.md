@@ -69,26 +69,26 @@ This extension contributes the following settings:
 
 ## FAQ
 
-**Can I have the text annotations in cornflower blue?**
+### Can I have the text annotations in cornflower blue?
 
 Abso-fucking-lutely.
 
-**I don't see any annotations..**
+### I don't see any annotations..
 
 Make sure to save the file you're working on, and that Wolf is activated.
 You can try stopping and starting Wolf again on the file to see if this
 helps.
 
-**The annotations are everywhere**
+### The annotations are everywhere
 
 Sorry, it's a feature for now. Try stopping and starting Wolf
 from the command menu to clear the pesky buggers.
 
-**Can my script have relative imports?**
+### Can my script have relative imports?
 
 Yes. Sorry, I mean, HELL YES!
 
-**Will APIs Hate Me?**
+### Will APIs Hate Me?
 
 That depends. If you code reponsibly and use something like
 diskcache or redis to cache your calls, then you'll do just
@@ -101,7 +101,7 @@ throttling by default.
 Here's an example using [diskcache](https://pypi.python.org/pypi/diskcache/):
 ![diskcache-example](images/diskcache_example.png)
 
-**Do you hate Quokka?**
+### Do you hate Quokka?
 
 No, I love it. I set out to learn how to decorate text in vscode
 and was looking for inspiration, I use Quokka all the time while
@@ -116,7 +116,7 @@ what I needed_. I spent a day on it tops so far and here we are
 now. So, again, NO I love Quokka, and recommend it to everyone
 using Javascript. But at the end of the day, the Wolf eats the Quokka.. likely for breakfast. ;)
 
-**Wolf is stupid.. PDB is better**
+### Wolf is stupid.. PDB is better
 
 ![pdb](https://memecreator.org/static/images/memes/4713467.jpg)
 
@@ -133,7 +133,7 @@ in videos. You can't get any better than _live feedback next to the code you're 
 
 ---
 
-##I found a bug##
+## I found a bug
 
 You mean a flea? Report any fleas in the issue tracker, please!
 
