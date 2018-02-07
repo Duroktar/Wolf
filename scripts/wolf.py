@@ -25,8 +25,8 @@ import os
 import sys
 import re
 import json
+import time
 from pprint import pformat
-from collections import namedtuple
 from importlib import util
 from contextlib import contextmanager
 
@@ -51,11 +51,13 @@ from pdb import Pdb
 #
 # XXX: This will NOT work with destructured assignments.
 # Named search groups are returned for convenience:
-#   print      <- the expression being printed
-#   assignment <- the variable being assigned to
-#   macro      <- the macro expression used
-_re = r'(print\((?P<print>\w+)\)|((?P<assignment>\w+)(\s*(=|\+=|\-=)\s*).*)\s*(?P<macro>#[$@!]{1})+)'
-WOLF_MACROS = re.compile(_re)
+#   print       <- the expression being printed
+#   assignment  <- the variable being assigned to
+#   macro       <- the macro expression used
+#   tag         <- macro tag (optional)
+_macro_re = r'(print\((?P<print>.+)\)|((?P<assignment>[a-z0-9]+)(\s*(=|\+=|\-=)\s*).*)\s*(?P<macro>#[$@!]{1}(?P<tag>[\w]{1})*)+)'
+WOLF_MACROS = re.compile(_macro_re)
+###########
 
 
 def firstFrom(M):
@@ -83,7 +85,8 @@ def import_file(full_name, fullpath):
 def script_path(script_dir):
     """
         Context manager for adding a dir to the sys path
-        and restoring it afterwards.
+        and restoring it afterwards. This trick allows
+        relative imports to work on the target script.
     """
     sys.path.insert(1, script_dir)
     yield
@@ -121,15 +124,13 @@ def script_path(script_dir):
 #                              ;  bug
 
 
-# WOLF[dict]: Results from each line trace [GLOBAL]
+# -% Globals %-
+#
+# WOLF[dict]: Results from each line trace
 WOLF = []
 
-# BACK_REF[id]: values to be looked up in the next trace
-BACK_REF = []
-Ref = namedtuple('Ref', [
-  'id',
-  'depth'
-])
+# BACK_REFS[metadata]: Queued evaluations
+BACK_REFS = []
 #########
 
 
@@ -159,15 +160,22 @@ def result_handler(event):
         Side Effects: Results are appended to the global WOLF list.
     """
 
-    # All hail the ..
+    # XXX: WARNING, SIDE EFFECTS MAY INCLUDE:
     global WOLF
-    global BACK_REF
+    global BACK_REFS
 
+    # NOTE: Consider refactoring this using
+    #      class variables instead of globals.
+
+    # We don't want any whitespace around our
+    # source code that could mess up the parser.
     source = event['source'].strip()
 
     # These are the fields returned from each line
-    # of the traced program.
-    meta = {
+    # of the traced program. This is essentially
+    # the metadata returned to the extension in the
+    # WOLF list.
+    metadata = {
         "line_number":        event['lineno'],
         "kind":                 event['kind'],
         "depth":               event['depth'],
@@ -175,12 +183,17 @@ def result_handler(event):
         # "value"      <-  Defined below MAYBE..
     }
 
+    # If this is still None by the end of the
+    # call, then no value will be present in
+    # the metadata. The extension will then
+    # use this fact to not create annotations
+    # for that line.
     value = None
 
     # We'll need to look up any values in the
     # correct scope, so let's grab the locals
-    # and globals from the current frame and
-    # build and mock environment.
+    # and globals from the current frame to
+    # use later on.
     _globals = event['globals']
     _locals = event['locals']
 
@@ -192,42 +205,64 @@ def result_handler(event):
     parts = firstFrom(words) if len(words) == 1 else None
 
     # We are also interested in lines that contain
-    # a macro. 'print' statements, etc..
+    # a macro. 'print' statements, 'timers', etc..
     match = WOLF_MACROS.search(source)
 
-    # Evaluate any pending back refs.. (see below  )
-    if BACK_REF:
-        ref = BACK_REF.pop()
+    # Evaluate any pending back refs.. (do this before putting
+    # any current refs in, so we don't just pull them back out
+    # in the same call.)
+    if BACK_REFS:
+        ref = BACK_REFS.pop()
+        # The "depth" let's us know when we've returned to the
+        # calling scope (ie: the right hand side has been fully
+        # evaluated.) So if the left hand side calls from depth
+        # 4, then the right hand side will be evaluated in depth
+        # 5, and once back to 4 can be considered finished.
         if ref['depth'] >= event['depth'] and event['kind'] != 'call':
+            # Right hand side is finished evaluating, we can
+            # now finish with the left hand side and updatine
+            # the WOLF result list.
             brf_result = eval(ref['_brf'], _globals, _locals)
             WOLF.append({**ref, 'value': brf_result})
         else:
-            BACK_REF.append(ref)
+            # In this case, we are _not_ done evaluating the right
+            # hand side, so we'll put the ref back into the queue.
+            # This is because either the "depth" was not back to
+            # the calling depth, or the "depth" is the same but the
+            # line is a reference to a "call" (which will have the
+            # same depth and cause an error) and not a "line".
+            BACK_REFS.append(ref)
 
+    # Now that back-refs are done, we can move on to the current
+    # ref. We'll check for macros first then single word lines.
     if match:
         # Hunter is basically a "pre" hook, so if we want
         # the value on the left hand side of the current
-        # expression we need to wait until the next line
-        # once it's actually been evaluated, otherwise we
-        # can get stale or undefined values.
+        # expression we need to wait until the right hand
+        # side has actually been evaluated, otherwise we
+        # get stale or undefined values.
         if match['assignment']:
-            # save it for lookup on the next line
-            meta['_brf'] = match['assignment']
-            BACK_REF.append(meta)
-        
-        # In this case we evaluate and return the same
-        # expression passed to print
+            # save it for lookup on the next line, this way
+            # we don't do another needless regex next run.
+            metadata['_brf'] = match['assignment']
+            BACK_REFS.append(metadata)
+
+        # In the case of print, we evaluate and return the same
+        # expression passed in.
         if match['print']:
             value = eval(match['print'], _globals, _locals)
 
+    # Check for any single word lines and evaluate those also.
     elif parts:
         value = eval(parts, _globals, _locals)
 
     if value is not None:
-        meta['value'] = resultifier(value)
+        # We only set the value if there is one, because the client
+        # will determine if it should decorate the line or not
+        # based on the existence of this field.
+        metadata['value'] = resultifier(value)
 
-    # XXX: SIDE EFFECTS
-    WOLF.append(meta)
+    WOLF.append(metadata)
 
 
 def filename_filter(filename):
