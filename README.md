@@ -29,31 +29,38 @@ When done, press `F1` again, type wolf and select `Wolf: Stop all running wolves
 > name and not an expression; the annotations (16)
 > cannot be edited.
 
-Using a macro:
+----
+
+**Macros!**
 
 ![macros-example](images/macros_example.png)
 
-**Track variables inside of functions!**
+----
+
+**Works inside functions!**
 
 ![functions-example](images/functions_example.png)
 
-**Works with loops!**
+----
+
+**Works with loops ..**
 
 ![loops-example](images/loops_example.png)
 
-**And recursion!**
+**and recursion!**
 
 ![recursion-example](images/recursion_example.png)
 
-> NOTE: There are limits, for example this will not respond when `n > 10`
-> on my PC, unless cached.
+----
 
-**Even works with http Requests!**
+**Works with http requests!**
 
 ![requests-example](images/requests_example.png)
 
 > NOTE: Please see FAQ section "Will APIs Hate Me?"
 before making requests with Wolf.
+
+----
 
 ## Requirements
 
