@@ -106,15 +106,15 @@ Here's an example using [diskcache](https://pypi.python.org/pypi/diskcache/):
 No, I love it. I set out to learn how to decorate text in vscode
 and was looking for inspiration, I use Quokka all the time while
 hacking away in JS land, and just really missed it when it came
-to Python. So I set to work on a simple POC and initially thought
+to Python. So I set to work on a simple clone and initially thought
 that I would hit a wall very quickly when it came to anything
 more than simple regex based stuff in the global scope of the
 script. I stumbled upon Hunter almost by accident (Back button
 was blurred, so I must have opened it in a new tab.. Probably
 reddit), there it was on PyPi with a screenshot _doing exactly
 what I needed_. I spent a day on it tops so far and here we are
-now. So, again, NO I love Quokka, and recommend it to everyone
-using Javascript. But at the end of the day, the Wolf eats the Quokka.. likely for breakfast. ;)
+now. So, again, I love Quokka, and recommend it to everyone
+using Javascript. But at the end of the day, the Wolf eats the Quokka.. ;)
 
 ### Wolf is stupid.. PDB is better
 
@@ -122,16 +122,56 @@ using Javascript. But at the end of the day, the Wolf eats the Quokka.. likely f
 
 \*Cue Jingle
 
-Honestly tho, if you need a real debugger, the one builtin to VSCode is
-about as good as it gets. So, really, please use that (or `pdb`, `ipdb`)
+Honestly, if you need a real debugger, the one builtin to VSCode is
+about as good as it gets. So really, please use that (or `pdb`, `ipdb`)
 if you're in need of stuff like breakpoints (or if lives depend on it, ie
 please don't use this to debug something like a drug pump ffs, ty).
 
-I see Wolf as more of an exploration tool, or for teachers and students
-in a learning environment, and definitely for streamers that teach Python
-in videos. You can't get any better than _live feedback next to the code you're editing_!
+I see Wolf as more of an exploration tool, for teachers or students
+in a learning environment, and definitely for streamers.
+You can't get any better than _live feedback next to the code you're editing_!
 
 ---
+
+New Features
+------------
+
+**New in v0.0.2**
+
+**Macros**
+
+You can now use macros to turn on line annotations or
+trigger features like timers, type converters, etc..
+Macros are simply a 'hashtag' symbol, optionally
+followed by a single character "tag", and placed at the
+end of the line of code you wish to affect.
+
+> Tags are used to customize the behavior of certain
+macros.
+
+Not all macros have tags; for example `Annotate` does
+not have any, and can be used by itself on a line.
+
+  - `#$` (Annotate)
+
+> NOTE: Timers/converters coming soon..
+
+Example:
+
+![macros-example](images/macros_example.png)
+
+**Auto evaluate print statements**
+
+Wolf now automatically evaluates `print` statements/functions
+
+Example:
+
+![print-example](images/print_example.png)
+
+
+----
+
+
 
 ## I found a bug
 
