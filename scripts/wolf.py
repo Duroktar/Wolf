@@ -23,7 +23,10 @@ limitations under the License.
 """
 import os
 import sys
+import re
 import json
+from pprint import pformat
+from collections import namedtuple
 from importlib import util
 from contextlib import contextmanager
 
@@ -37,7 +40,22 @@ from pdb import Pdb
 
 ###################
 #
-# Utilities, helper functions, etc..
+# Utilities, helper functions, regex ..
+
+# This is to help us find lines tagged with a Wolf
+# macro. If the line has a print statement, then we
+# want the expression being printed, if it's a
+# assignment then we want the variable.
+#
+# TODO: timer macro, track loop variables
+#
+# XXX: This will NOT work with destructured assignments.
+# Named search groups are returned for convenience:
+#   print      <- the expression being printed
+#   assignment <- the variable being assigned to
+#   macro      <- the macro expression used
+_re = r'(print\((?P<print>\w+)\)|((?P<assignment>\w+)(\s*(=|\+=|\-=)\s*).*)\s*(?P<macro>#[$@!]{1})+)'
+WOLF_MACROS = re.compile(_re)
 
 
 def firstFrom(M):
@@ -105,7 +123,32 @@ def script_path(script_dir):
 
 # WOLF[dict]: Results from each line trace [GLOBAL]
 WOLF = []
+
+# BACK_REF[id]: values to be looked up in the next trace
+BACK_REF = []
+Ref = namedtuple('Ref', [
+  'id',
+  'depth'
+])
 #########
+
+
+def resultifier(value):
+    # Here we can set the string representation
+    # of the result. For example, callables are
+    # simply converted to Python strings.
+    #
+    #   ie: def add(a, b): return a + b
+    #
+    #   Will (usually) be represented as:
+    #       <function add at 0x7f768395ad95>
+    #
+    #########
+    if value:
+        if callable(value):
+            return str(value)
+        else:
+            return value
 
 
 def result_handler(event):
@@ -118,49 +161,72 @@ def result_handler(event):
 
     # All hail the ..
     global WOLF
+    global BACK_REF
 
     source = event['source'].strip()
 
     # These are the fields returned from each line
     # of the traced program.
     meta = {
-        "line_number":  event['lineno'],
-        "kind":         event['kind'],
-        "depth":         event['depth'],
+        "line_number":        event['lineno'],
+        "kind":                 event['kind'],
+        "depth":               event['depth'],
+        "source":             event['source'],
         # "value"      <-  Defined below MAYBE..
     }
+
+    value = None
+
+    # We'll need to look up any values in the
+    # correct scope, so let's grab the locals
+    # and globals from the current frame and
+    # build and mock environment.
+    _globals = event['globals']
+    _locals = event['locals']
 
     # This is the important part. Wolf is interested
     # in single word statements in the source code,
     # so that when found, they can be evaluated and
     # returned to the Wolf client for line decoration.
-    parts = source.split(' ')
-    if len(parts) == 1:
-        # Obviously, we need to look up the value in
-        # the correct environment. So we build it here
-        # using the globals and locals provided by the
-        # event props.
-        env = {**event['globals'], **event['locals']}
-        value = env.get(firstFrom(parts))
+    words = source.split(' ')
+    parts = firstFrom(words) if len(words) == 1 else None
 
-        # Here we can set the string representations
-        # of the results. For example, callables are
-        # simply converted to Python strings.
-        #
-        #   ie: def add(a, b): return a + b
-        #
-        #   Will (usually) be represented as:
-        #       <function add at 0x7f768395ad95>
-        #
-        # Result is stored in the meta `value` prop
-        #########
-        if value:
-            if callable(value):
-                meta['value'] = str(value)
-            else:
-                meta['value'] = value
+    # We are also interested in lines that contain
+    # a macro. 'print' statements, etc..
+    match = WOLF_MACROS.search(source)
 
-    # XXX: SIDE EFFECT
+    # Evaluate any pending back refs.. (see below  )
+    if BACK_REF:
+        ref = BACK_REF.pop()
+        if ref['depth'] >= event['depth'] and event['kind'] != 'call':
+            brf_result = eval(ref['_brf'], _globals, _locals)
+            WOLF.append({**ref, 'value': brf_result})
+        else:
+            BACK_REF.append(ref)
+
+    if match:
+        # Hunter is basically a "pre" hook, so if we want
+        # the value on the left hand side of the current
+        # expression we need to wait until the next line
+        # once it's actually been evaluated, otherwise we
+        # can get stale or undefined values.
+        if match['assignment']:
+            # save it for lookup on the next line
+            meta['_brf'] = match['assignment']
+            BACK_REF.append(meta)
+        
+        # In this case we evaluate and return the same
+        # expression passed to print
+        if match['print']:
+            value = eval(match['print'], _globals, _locals)
+
+    elif parts:
+        value = eval(parts, _globals, _locals)
+
+    if value is not None:
+        meta['value'] = resultifier(value)
+
+    # XXX: SIDE EFFECTS
     WOLF.append(meta)
 
 
@@ -259,6 +325,7 @@ def main(filename):
         return 1
 
     if WOLF:
+        print("DEBUG:" + pformat(WOLF, indent=4), file=sys.stderr)
 
         # It's important that we create an output that can be handled
         # by the javascript `JSON.parse(...)` function.
