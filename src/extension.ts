@@ -27,7 +27,6 @@ export function activate(context: vscode.ExtensionContext) {
   const annotationDecoration: TextEditorDecorationType = vscode.window.createTextEditorDecorationType(
     {
       after: {
-        // color: cornflower,
         margin: "0 0 0 3em",
         textDecoration: "none"
       }
@@ -204,9 +203,9 @@ export function activate(context: vscode.ExtensionContext) {
         console.error("JSON PARSE ERROR.");
         return;
       }
-
+      
       // TODO: Create a Wolf "OUTPUT" window
-      // console.log(`${data}`);
+      // console.log(data.toString('utf8'));
 
       const decorations: vscode.DecorationOptions[] = [];
       const annotations = {};
