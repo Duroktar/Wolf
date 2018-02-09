@@ -47,7 +47,7 @@ from pdb import Pdb
 # want the expression being printed, if it's a
 # assignment then we want the variable.
 #
-# TODO: timer macro, track loop variables
+# TODO: timer macro
 #
 # XXX: This will NOT work with destructured assignments.
 # Named search groups are returned for convenience:
@@ -59,7 +59,9 @@ from pdb import Pdb
 #   (function, args)    <- a function and the args passed in
 #   macro               <- the macro expression used
 #   tag                 <- macro tag (optional)
-_macro_re = r'^(?P<variable>\w+)$|print\((?P<print>.+)\)|((^(?P<function>\w+)\((?P<args>.*)\)\s*|(?P<assignment>\w+)(\s*=|\+=|-=\s*).*|return (?P<return>.*)|(for\s*(?P<for>.+)( in ).*)|while\s*(?P<while>.*)(:\s*))(?P<macro>#[$!]{1})(?P<tag>[\w]{1})*)'
+#
+# NOTE: See https://regex101.com/r/npWf6w/5 for demo
+_macro_re = r'^(?!pass)(?P<variable>\w+)$|print\((?P<print>.+)\)|((^(?P<function>\w+)\((?P<args>.*)\)\s*|(?P<assignment>\w+)(\s*=|\+=|-=\s*).*|return (?P<return>.*)|(for\s*(?P<for>.+)( in ).*)|while\s*(?P<while>.*)(:\s*))(?P<macro>#[$!]{1})(?P<tag>[\w]{1})*)'
 WOLF_MACROS = re.compile(_macro_re)
 ###########
 
@@ -143,7 +145,7 @@ def resultifier(value):
     #########
     if value:
         if callable(value):
-            return str(value)
+            return repr(value)
         else:
             return value
 
@@ -193,9 +195,9 @@ def result_handler(event):
     _globals = event['globals']
     _locals = event['locals']
 
-    # This regex does all the heavy lifting. Paste it into
-    # https://regex101.com/ for a better explanation than
-    # I could muster up after writing the damn thing.
+    # This regex does all the heavy lifting. Check out
+    # https://regex101.com/r/npWf6w/5 for an example of
+    # # how it works.
     match = WOLF_MACROS.search(source)
 
     # Evaluate any pending back refs.. (do this before putting
