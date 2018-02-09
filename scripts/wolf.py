@@ -151,7 +151,7 @@ def resultifier(value):
             return value
 
 
-def wolf_print():
+def wolf_prints():
     # It's important that we create an output that can be handled
     # by the javascript `JSON.parse(...)` function.
     python_data = ", ".join(json.dumps(resultifier(i)) for i in WOLF)
@@ -168,12 +168,7 @@ def try_eval(*args, **kw):
     try:
         rv = eval(*args)
     except Exception as e:
-        # exc_type, exc_obj, exc_tb = sys.exc_info()
-        # tb = traceback.extract_tb(exc_tb)[-1]
-        # print(exc_type, tb[2], tb[1])
         if event['kind'] == 'line':
-            exc_type, exc_value, exc_traceback = sys.exc_info()
-            tb = traceback.extract_tb(exc_traceback)
             metadata = {
                 "line_number": event['lineno'],
                 "kind": event['kind'],
@@ -182,8 +177,9 @@ def try_eval(*args, **kw):
             }
 
             WOLF.append(resultifier(metadata))
-            python_data = ", ".join(json.dumps(resultifier(i)) for i in WOLF)
-            print("WOOF: [" + python_data + "]", file=sys.stdout) 
+
+            wolf_prints()
+
             sys.exit(0)
     else:
         return rv
@@ -253,14 +249,26 @@ def result_handler(event):
             # Right hand side is finished evaluating, we can
             # now finish with the left hand side and update
             # the WOLF result list.
+
+            # This handles destructured assignments. Multiple
+            # variables on the left side need to stay grouped
+            # together in the result.
             if isinstance(ref['_brf'], list):
                 brf_result = []
                 for var in ref['_brf']:
-                    brf_result.append(eval(var, _globals, _locals))
-                brf_result = brf_result[0] if len(brf_result) == 1 else brf_result
-            else:
-                brf_result = eval(ref['_brf'], _globals, _locals)
+                    brf_result.append(try_eval(var, _globals, _locals))
 
+                # Flatten it out so we don't get deeply nested lists
+                # in our results.
+                brf_result = brf_result[0] if len(brf_result) == 1 else brf_result
+
+            # Otherwise it's just a single variable and we can evaluate
+            # it right away.
+            else:
+                brf_result = try_eval(ref['_brf'], _globals, _locals)
+
+            # Add the original ref to our result and tack on the value
+            # to be decorated.
             WOLF.append({**ref, 'value': brf_result})
         else:
             # In this case, we are _not_ done evaluating the right
@@ -293,10 +301,10 @@ def result_handler(event):
         # In the case of print, we evaluate and return the same
         # expression passed in.
         if match['print']:
-            value = eval(match['print'], _globals, _locals)
+            value = try_eval(match['print'], _globals, _locals)
 
         if match['return']:
-            value = eval(match['return'], _globals, _locals)
+            value = try_eval(match['return'], _globals, _locals)
 
         if match['for']:
             accum = []
@@ -313,7 +321,7 @@ def result_handler(event):
             BACK_REFS.append(metadata)
 
         if match['function']:
-            value = eval(f'{match["function"]}(*[{match["args"]}])', _globals, _locals)
+            value = try_eval(f'{match["function"]}(*[{match["args"]}])', _globals, _locals)
 
     if value is not None:
         # We only set the value if there is one, because the client
@@ -411,23 +419,45 @@ def main(filename):
     # ie: /home/duroktar/scripts/my_script.py  ->  my_script
     module_name = os.path.basename(module_path).split('.')[0]
 
+    # Okay, so let's go ahead and fire this thing up.
     try:
+
         import_and_trace_script(module_name, module_path)
+
     except Exception as e:
-        print('RUNTIME_ERROR: There was an error running the provided script..', file=sys.stderr)
-        print(e, file=sys.stderr)
-        return 1
+
+        # If there's an error, we try to handle it and
+        # send back data that can be used to decorate
+        # the offending line.
+        # 
+        # NOTE: I prefer the `repr(e)` over inspects object
+        # repr, so I decided to use that instead.
+        exc_type, exc_value, exc_traceback = sys.exc_info()
+        tb = traceback.extract_tb(exc_traceback)[-1]
+        metadata = {
+            "line_number": tb[1],
+            "value": repr(e),
+            "error": True
+        }
+
+        # And tack the error on to our response.
+        WOLF.append(resultifier(metadata))
 
     if WOLF:
+
+        # Just some pretty lines for visual debugging. We can send
+        # data to `stderr` and `stdout` because the client has a
+        # different handler implemented for each.
         print("DEBUG:" + pformat(WOLF, indent=4), file=sys.stderr)
 
-        # Everything seemed to go "okay", let's print the results
-        # and return 0 for an exit code
-        wolf_print()
+        # We must have some data ready for the client, let's print
+        # the results and return a 0 for the exit code
+        wolf_prints()
         return 0
 
-    # This isn't necessarily and error. Maybe the file is empty. Either
-    # way, we'll return 1 so the extension can skip the render loop.
+    # This isn't necessarily an error (maybe the file is empty). Either
+    # way, we'll return 1 so the extension can skip the render loop by
+    # minding the status code.
     return 1
 
 

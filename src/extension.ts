@@ -184,23 +184,16 @@ export function activate(context: vscode.ExtensionContext) {
       });
 
     python.stdout.on("data", data => {
-      // TODO: Create a Wolf "OUTPUT" window
-      console.log(`HERE: ${data}`);
-
       // The script didn't return an error code, let's
       // parse the data..
       const w_index = indexOfEnd(data + "", "WOOF:");
       if (w_index === -1) {
         // Nothing, maybe a new file..
-        if (w_index === -1) {
-          return;
-        } else {
-          console.log('Wubba lubba dub dub!')
-        }
+        return;
       }
-
+      
       // ---------
-
+      
       let lines;
       try {
         lines = JSON.parse(data.slice(w_index));
@@ -210,6 +203,9 @@ export function activate(context: vscode.ExtensionContext) {
         console.error("JSON PARSE ERROR.");
         return;
       }
+
+      // TODO: Create a Wolf "OUTPUT" window
+      // console.log(`${data}`);
 
       const decorations: vscode.DecorationOptions[] = [];
       const annotations = {};
