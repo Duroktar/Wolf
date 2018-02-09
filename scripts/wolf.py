@@ -26,6 +26,7 @@ import sys
 import re
 import json
 import time
+import traceback
 from pprint import pformat
 from importlib import util
 from contextlib import contextmanager
@@ -150,6 +151,44 @@ def resultifier(value):
             return value
 
 
+def wolf_print():
+    # It's important that we create an output that can be handled
+    # by the javascript `JSON.parse(...)` function.
+    python_data = ", ".join(json.dumps(resultifier(i)) for i in WOLF)
+
+    # DO NOT TOUCH, ie: no pretty printing
+    print("WOOF: [" + python_data + "]")  # <--  Wolf result
+    ######################################
+
+
+def try_eval(*args, **kw):
+    global WOLF
+    event = kw.get('event')
+
+    try:
+        rv = eval(*args)
+    except Exception as e:
+        # exc_type, exc_obj, exc_tb = sys.exc_info()
+        # tb = traceback.extract_tb(exc_tb)[-1]
+        # print(exc_type, tb[2], tb[1])
+        if event['kind'] == 'line':
+            exc_type, exc_value, exc_traceback = sys.exc_info()
+            tb = traceback.extract_tb(exc_traceback)
+            metadata = {
+                "line_number": event['lineno'],
+                "kind": event['kind'],
+                "value": repr(e),
+                "error": True
+            }
+
+            WOLF.append(resultifier(metadata))
+            python_data = ", ".join(json.dumps(resultifier(i)) for i in WOLF)
+            print("WOOF: [" + python_data + "]", file=sys.stdout) 
+            sys.exit(0)
+    else:
+        return rv
+
+
 def result_handler(event):
     """
         Called by the `trace` function to handle any actions post
@@ -249,7 +288,7 @@ def result_handler(event):
         # The simplest case is a variable, which we'll just
         # evaluate it directly.
         if match['variable']:
-            value = eval(match['variable'], _globals, _locals)
+            value = try_eval(match['variable'], _globals, _locals, event=event)
 
         # In the case of print, we evaluate and return the same
         # expression passed in.
@@ -368,29 +407,27 @@ def main(filename):
     # The full path to the script (including filename and extension)
     module_path = os.path.abspath(filename)
 
-    # The `importable` name of the target file
+    # The `import`able name of the target file
     # ie: /home/duroktar/scripts/my_script.py  ->  my_script
     module_name = os.path.basename(module_path).split('.')[0]
 
     try:
         import_and_trace_script(module_name, module_path)
     except Exception as e:
-        print('RUNTIME_ERROR: There was an error running the provided script..')
+        print('RUNTIME_ERROR: There was an error running the provided script..', file=sys.stderr)
         print(e, file=sys.stderr)
         return 1
 
     if WOLF:
         print("DEBUG:" + pformat(WOLF, indent=4), file=sys.stderr)
 
-        # It's important that we create an output that can be handled
-        # by the javascript `JSON.parse(...)` function.
-        python_data = ", ".join(json.dumps(resultifier(i)) for i in WOLF)
-
-        # DO NOT TOUCH, ie: no pretty printing
-        print("WOOF: [" + python_data + "]")  # <--  Wolf result
-        ######################################
+        # Everything seemed to go "okay", let's print the results
+        # and return 0 for an exit code
+        wolf_print()
         return 0
 
+    # This isn't necessarily and error. Maybe the file is empty. Either
+    # way, we'll return 1 so the extension can skip the render loop.
     return 1
 
 
@@ -399,4 +436,4 @@ if __name__ == '__main__':
         print("ARGS_ERROR: Must provide a file to trace.")
         exit(1)
 
-    exit(main(sys.argv[1]))
+    sys.exit(main(sys.argv[1]))

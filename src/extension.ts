@@ -15,6 +15,11 @@ const { spawn, spawnSync } = require("child_process");
 
 const cornflower = "#6495ed";
 
+function indexOfEnd(string, target) {
+  var io = string.indexOf(target);
+  return io == -1 ? -1 : io + target.length;
+}
+
 let activeSessions = {};
 
 export function activate(context: vscode.ExtensionContext) {
@@ -179,25 +184,29 @@ export function activate(context: vscode.ExtensionContext) {
       });
 
     python.stdout.on("data", data => {
+      // TODO: Create a Wolf "OUTPUT" window
+      console.log(`HERE: ${data}`);
+
       // The script didn't return an error code, let's
       // parse the data..
-      const w_index = data.indexOf("WOOF:");
+      const w_index = indexOfEnd(data + "", "WOOF:");
       if (w_index === -1) {
-        // Nothing, maybe an new file ..
-        return;
+        // Nothing, maybe a new file..
+        if (w_index === -1) {
+          return;
+        } else {
+          console.log('Wubba lubba dub dub!')
+        }
       }
-
-      // TODO: Create a Wolf "OUTPUT" window
-      console.log(`${data}`);
 
       // ---------
 
       let lines;
       try {
-        // slice from the `WOLF:` tag (index + 5)
-        lines = JSON.parse(data.slice(w_index + 5));
+        lines = JSON.parse(data.slice(w_index));
       } catch (err) {
-        console.error("ERROR_LINES:", lines);
+        console.error("ERROR_DATA:", data);
+        console.error("W_INDEX:", w_index);
         console.error("JSON PARSE ERROR.");
         return;
       }
@@ -209,7 +218,7 @@ export function activate(context: vscode.ExtensionContext) {
       lines.forEach(element => {
         let value;
         const hasValue = element.hasOwnProperty('value');
-        if (hasValue && element.kind === "line") {
+        if (hasValue && element.kind === "line" || element.error) {
           if (Array.isArray(element.value)) {
             value = "[" + element.value + "]";
           } else if (typeof element.value === "string") {
