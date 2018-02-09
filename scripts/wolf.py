@@ -256,7 +256,7 @@ def result_handler(event):
             if isinstance(ref['_brf'], list):
                 brf_result = []
                 for var in ref['_brf']:
-                    brf_result.append(try_eval(var, _globals, _locals))
+                    brf_result.append(try_eval(var, _globals, _locals, event=event))
 
                 # Flatten it out so we don't get deeply nested lists
                 # in our results.
@@ -265,7 +265,7 @@ def result_handler(event):
             # Otherwise it's just a single variable and we can evaluate
             # it right away.
             else:
-                brf_result = try_eval(ref['_brf'], _globals, _locals)
+                brf_result = try_eval(ref['_brf'], _globals, _locals, event=event)
 
             # Add the original ref to our result and tack on the value
             # to be decorated.
@@ -301,10 +301,10 @@ def result_handler(event):
         # In the case of print, we evaluate and return the same
         # expression passed in.
         if match['print']:
-            value = try_eval(match['print'], _globals, _locals)
+            value = try_eval(match['print'], _globals, _locals, event=event)
 
         if match['return']:
-            value = try_eval(match['return'], _globals, _locals)
+            value = try_eval(match['return'], _globals, _locals, event=event)
 
         if match['for']:
             accum = []
@@ -321,7 +321,7 @@ def result_handler(event):
             BACK_REFS.append(metadata)
 
         if match['function']:
-            value = try_eval(f'{match["function"]}(*[{match["args"]}])', _globals, _locals)
+            value = try_eval(f'{match["function"]}(*[{match["args"]}])', _globals, _locals, event=event)
 
     if value is not None:
         # We only set the value if there is one, because the client
