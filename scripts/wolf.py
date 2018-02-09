@@ -144,17 +144,20 @@ def resultifier(value):
     #       <function add at 0x7f768395ad95>
     #
     #########
-    if value:
-        if callable(value):
-            return repr(value)
-        else:
-            return value
+    if callable(value):
+        return repr(value)
+    elif value is None:
+        return ''
+    else:
+        return value
+
+b = {}
 
 
 def wolf_prints():
     # It's important that we create an output that can be handled
     # by the javascript `JSON.parse(...)` function.
-    python_data = ", ".join(json.dumps(resultifier(i)) for i in WOLF)
+    python_data = ", ".join(json.dumps(resultifier(i)) for i in WOLF if 'value' in i.keys())
 
     # DO NOT TOUCH, ie: no pretty printing
     print("WOOF: [" + python_data + "]")  # <--  Wolf result
@@ -269,7 +272,7 @@ def result_handler(event):
 
             # Add the original ref to our result and tack on the value
             # to be decorated.
-            WOLF.append({**ref, 'value': brf_result})
+            WOLF.append({**ref, 'value': resultifier(brf_result)})
         else:
             # In this case, we are _not_ done evaluating the right
             # hand side, so we'll put the ref back into the queue.
@@ -448,7 +451,7 @@ def main(filename):
         # Just some pretty lines for visual debugging. We can send
         # data to `stderr` and `stdout` because the client has a
         # different handler implemented for each.
-        print("DEBUG:" + pformat(WOLF, indent=4), file=sys.stderr)
+        # print("DEBUG:" + pformat(WOLF, indent=4), file=sys.stderr)
 
         # We must have some data ready for the client, let's print
         # the results and return a 0 for the exit code
