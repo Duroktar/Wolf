@@ -51,21 +51,17 @@ from pdb import Pdb
 #
 # XXX: This will NOT work with destructured assignments.
 # Named search groups are returned for convenience:
-#   print       <- the expression being printed
-#   assignment  <- the variable being assigned to
-#   macro       <- the macro expression used
-#   tag         <- macro tag (optional)
-_macro_re = r'(print\((?P<print>.+)\)|((?P<assignment>[a-z0-9]+)(\s*(=|\+=|\-=)\s*).*)\s*(?P<macro>#[$@!]{1}(?P<tag>[\w]{1})*)+)'
+#   variable            <- the simplest case, a single variable
+#   assignment          <- the variable being assigned to
+#   print               <- the expression being printed
+#   for                 <- a for loop and its vars
+#   while               <- a while loop and its predicate
+#   (function, args)    <- a function and the args passed in
+#   macro               <- the macro expression used
+#   tag                 <- macro tag (optional)
+_macro_re = r'^(?P<variable>\w+)$|print\((?P<print>.+)\)|((^(?P<function>\w+)\((?P<args>.*)\)\s*|(?P<assignment>\w+)(\s*=|\+=|-=\s*).*|return (?P<return>.*)|(for\s*(?P<for>.+)( in ).*)|while\s*(?P<while>.*)(:\s*))(?P<macro>#[$!]{1})(?P<tag>[\w]{1})*)'
 WOLF_MACROS = re.compile(_macro_re)
 ###########
-
-
-def firstFrom(M):
-    """
-        "Safe" function for retriving the first element from an
-        indexed collection. ex: retrieve the "head" of a list.
-    """
-    return M and M[0]
 
 
 def import_file(full_name, fullpath):
@@ -197,15 +193,9 @@ def result_handler(event):
     _globals = event['globals']
     _locals = event['locals']
 
-    # This is the important part. Wolf is interested
-    # in single word statements in the source code,
-    # so that when found, they can be evaluated and
-    # returned to the Wolf client for line decoration.
-    words = source.split(' ')
-    parts = firstFrom(words) if len(words) == 1 else None
-
-    # We are also interested in lines that contain
-    # a macro. 'print' statements, 'timers', etc..
+    # This regex does all the heavy lifting. Paste it into
+    # https://regex101.com/ for a better explanation than
+    # I could muster up after writing the damn thing.
     match = WOLF_MACROS.search(source)
 
     # Evaluate any pending back refs.. (do this before putting
@@ -220,9 +210,16 @@ def result_handler(event):
         # 5, and once back to 4 can be considered finished.
         if ref['depth'] >= event['depth'] and event['kind'] != 'call':
             # Right hand side is finished evaluating, we can
-            # now finish with the left hand side and updatine
+            # now finish with the left hand side and update
             # the WOLF result list.
-            brf_result = eval(ref['_brf'], _globals, _locals)
+            if isinstance(ref['_brf'], list):
+                brf_result = []
+                for var in ref['_brf']:
+                    brf_result.append(eval(var, _globals, _locals))
+                brf_result = brf_result[0] if len(brf_result) == 1 else brf_result
+            else:
+                brf_result = eval(ref['_brf'], _globals, _locals)
+
             WOLF.append({**ref, 'value': brf_result})
         else:
             # In this case, we are _not_ done evaluating the right
@@ -247,14 +244,35 @@ def result_handler(event):
             metadata['_brf'] = match['assignment']
             BACK_REFS.append(metadata)
 
+        # The simplest case is a variable, which we'll just
+        # evaluate it directly.
+        if match['variable']:
+            value = eval(match['variable'], _globals, _locals)
+
         # In the case of print, we evaluate and return the same
         # expression passed in.
         if match['print']:
             value = eval(match['print'], _globals, _locals)
 
-    # Check for any single word lines and evaluate those also.
-    elif parts:
-        value = eval(parts, _globals, _locals)
+        if match['return']:
+            value = eval(match['return'], _globals, _locals)
+
+        if match['for']:
+            accum = []
+            loop_vars = match['for'].split(',')
+            for var in loop_vars:
+                accum.append(var)
+            metadata['_brf'] = accum
+            metadata['_loop'] = True
+            BACK_REFS.append(metadata)
+
+        if match['while']:
+            metadata['_brf'] = match['while']
+            metadata['_loop'] = True
+            BACK_REFS.append(metadata)
+
+        if match['function']:
+            value = eval(f'{match["function"]}(*[{match["args"]}])', _globals, _locals)
 
     if value is not None:
         # We only set the value if there is one, because the client
@@ -364,7 +382,7 @@ def main(filename):
 
         # It's important that we create an output that can be handled
         # by the javascript `JSON.parse(...)` function.
-        python_data = ", ".join(json.dumps(i) for i in WOLF)
+        python_data = ", ".join(json.dumps(resultifier(i)) for i in WOLF)
 
         # DO NOT TOUCH, ie: no pretty printing
         print("WOOF: [" + python_data + "]")  # <--  Wolf result
