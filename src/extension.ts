@@ -14,6 +14,7 @@ import {
 const { spawn, spawnSync } = require("child_process");
 
 const cornflower = "#6495ed";
+const stopRed = "#ea2f36";
 
 function indexOfEnd(string, target) {
   var io = string.indexOf(target);
@@ -26,7 +27,7 @@ export function activate(context: vscode.ExtensionContext) {
   const annotationDecoration: TextEditorDecorationType = vscode.window.createTextEditorDecorationType(
     {
       after: {
-        color: cornflower,
+        // color: cornflower,
         margin: "0 0 0 3em",
         textDecoration: "none"
       }
@@ -232,6 +233,7 @@ export function activate(context: vscode.ExtensionContext) {
           const hasSeen = meta.data;
           const payload = {
             _loop: false,
+            _error: element.error ? true : false,
             data: null
           }
 
@@ -259,7 +261,8 @@ export function activate(context: vscode.ExtensionContext) {
             after: {
               contentText: `${annotation.data}`,
               fontWeight: "normal",
-              fontStyle: "normal"
+              fontStyle: "normal",
+              color: annotation._error ? stopRed : cornflower
             }
           } as DecorationRenderOptions
         } as DecorationOptions;
