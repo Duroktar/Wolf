@@ -248,7 +248,7 @@ def result_handler(event):
         # evaluated.) So if the left hand side calls from depth
         # 4, then the right hand side will be evaluated in depth
         # 5, and once back to 4 can be considered finished.
-        if ref['depth'] >= event['depth'] and event['kind'] != 'call':
+        if ref['depth'] == event['depth'] and event['kind'] != 'call':
             # Right hand side is finished evaluating, we can
             # now finish with the left hand side and update
             # the WOLF result list.
@@ -273,14 +273,18 @@ def result_handler(event):
             # Add the original ref to our result and tack on the value
             # to be decorated.
             WOLF.append({**ref, 'value': resultifier(brf_result)})
-        else:
+        elif ref['depth'] > event['depth']:
+
             # In this case, we are _not_ done evaluating the right
             # hand side, so we'll put the ref back into the queue.
             # This is because either the "depth" was not back to
             # the calling depth, or the "depth" is the same but the
             # line is a reference to a "call" (which will have the
-            # same depth and cause an error) and not a "line".
+            # same depth and cause an error) and not a "line". If
+            # drop to a _lower_ depth, then we'll discard the ref
+            # as it's N + 1 and not part of the pass.
             BACK_REFS.append(ref)
+
 
     # Now that back-refs are done, we can move on to the current
     # ref. We'll check for macros first then single word lines.
