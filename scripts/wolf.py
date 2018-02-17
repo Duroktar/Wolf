@@ -25,18 +25,16 @@ import os
 import sys
 import re
 import json
-import time
 import traceback
 from pprint import pformat
 from importlib import util
 from contextlib import contextmanager
 
 try:
-    from hunter import trace, Q, wrap
+    from hunter import trace
 except ImportError:
     print('IMPORT_ERROR: hunter not installed.', file=sys.stderr)
     exit(1)
-from pdb import Pdb
 
 
 ###################
@@ -46,23 +44,17 @@ from pdb import Pdb
 # This is to help us find lines tagged with a Wolf
 # macro. If the line has a print statement, then we
 # want the expression being printed, if it's a
-# assignment then we want the variable.
+# single variable, we want that.
 #
 # TODO: timer macro
 #
 # XXX: This will NOT work with destructured assignments.
 # Named search groups are returned for convenience:
 #   variable            <- the simplest case, a single variable
-#   assignment          <- the variable being assigned to
 #   print               <- the expression being printed
-#   for                 <- a for loop and its vars
-#   while               <- a while loop and its predicate
-#   (function, args)    <- a function and the args passed in
-#   macro               <- the macro expression used
-#   tag                 <- macro tag (optional)
 #
-# NOTE: See https://regex101.com/r/npWf6w/5 for demo
-_macro_re = r'^(?!pass)(?P<variable>\w+)$|print\((?P<print>.+)\)|((^(?P<function>\w+)\((?P<args>.*)\)\s*|(?P<assignment>\w+)(\s*=|\+=|-=\s*).*|return (?P<return>.*)|(for\s*(?P<for>.+)( in ).*)|while\s*(?P<while>.*)(:\s*))(?P<macro>#[$!]{1})(?P<tag>[\w]{1})*)'
+# NOTE: See https://regex101.com/r/uRio5u/1 for demo
+_macro_re = r'^(?!pass)(?P<variable>\w+)$|print\((?P<print>.+)\)'
 WOLF_MACROS = re.compile(_macro_re)
 ###########
 
@@ -127,16 +119,15 @@ def script_path(script_dir):
 #
 # WOLF[dict]: Results from each line trace
 WOLF = []
-
-# BACK_REFS[metadata]: Queued evaluations
-BACK_REFS = []
 #########
 
 
 def resultifier(value):
     # Here we can set the string representation
     # of the result. For example, callables are
-    # simply converted to Python strings.
+    # simply converted to their string repr. None
+    # is converted to "None". And anything else
+    # is pretty formatted to a string.
     #
     #   ie: def add(a, b): return a + b
     #
@@ -147,17 +138,18 @@ def resultifier(value):
     if callable(value):
         return repr(value)
     elif value is None:
-        return ''
-    else:
+        return 'None'
+    elif isinstance(value, int):
         return value
-
-b = {}
+    else:
+        return pformat(value)
 
 
 def wolf_prints():
     # It's important that we create an output that can be handled
     # by the javascript `JSON.parse(...)` function.
-    python_data = ", ".join(json.dumps(resultifier(i)) for i in WOLF if 'value' in i.keys())
+    results = [json.dumps(i) for i in WOLF if 'value' in i.keys()]
+    python_data = ", ".join(results)
 
     # DO NOT TOUCH, ie: no pretty printing
     print("WOOF: [" + python_data + "]")  # <--  Wolf result
@@ -174,15 +166,13 @@ def try_eval(*args, **kw):
         if event['kind'] == 'line':
             metadata = {
                 "line_number": event['lineno'],
-                "kind": event['kind'],
-                "value": repr(e),
-                "error": True
+                "kind":          event['kind'],
+                "value":               repr(e),
+                "error":                   True
             }
 
-            WOLF.append(resultifier(metadata))
-
+            WOLF.append(metadata)
             wolf_prints()
-
             sys.exit(0)
     else:
         return rv
@@ -198,7 +188,6 @@ def result_handler(event):
 
     # XXX: WARNING, SIDE EFFECTS MAY INCLUDE:
     global WOLF
-    global BACK_REFS
 
     # NOTE: Consider refactoring this using
     #      class variables instead of globals.
@@ -219,11 +208,8 @@ def result_handler(event):
         # "value"      <-  Defined below MAYBE..
     }
 
-    # If this is still None by the end of the
-    # call, then no value will be present in
-    # the metadata. The extension will then
-    # use this fact to not create annotations
-    # for that line.
+    # The annotation will take on this value
+    # (if present).
     value = None
 
     # We'll need to look up any values in the
@@ -238,109 +224,26 @@ def result_handler(event):
     # # how it works.
     match = WOLF_MACROS.search(source)
 
-    # Evaluate any pending back refs.. (do this before putting
-    # any current refs in, so we don't just pull them back out
-    # in the same call.)
-    if BACK_REFS:
-        ref = BACK_REFS.pop()
-        # The "depth" let's us know when we've returned to the
-        # calling scope (ie: the right hand side has been fully
-        # evaluated.) So if the left hand side calls from depth
-        # 4, then the right hand side will be evaluated in depth
-        # 5, and once back to 4 can be considered finished.
-        if ref['depth'] == event['depth'] and event['kind'] != 'call':
-            # Right hand side is finished evaluating, we can
-            # now finish with the left hand side and update
-            # the WOLF result list.
-
-            # This handles destructured assignments. Multiple
-            # variables on the left side need to stay grouped
-            # together in the result.
-            if isinstance(ref['_brf'], list):
-                brf_result = []
-                for var in ref['_brf']:
-                    brf_result.append(try_eval(var, _globals, _locals, event=event))
-
-                # Flatten it out so we don't get deeply nested lists
-                # in our results.
-                brf_result = brf_result[0] if len(brf_result) == 1 else brf_result
-
-            # Otherwise it's just a single variable and we can evaluate
-            # it right away.
-            else:
-                brf_result = try_eval(ref['_brf'], _globals, _locals, event=event)
-
-            # Add the original ref to our result and tack on the value
-            # to be decorated.
-            WOLF.append({**ref, 'value': resultifier(brf_result)})
-        elif ref['depth'] > event['depth']:
-
-            # In this case, we are _not_ done evaluating the right
-            # hand side, so we'll put the ref back into the queue.
-            # This is because either the "depth" was not back to
-            # the calling depth, or the "depth" is the same but the
-            # line is a reference to a "call" (which will have the
-            # same depth and cause an error) and not a "line". If
-            # drop to a _lower_ depth, then we'll discard the ref
-            # as it's N + 1 and not part of the pass.
-            BACK_REFS.append(ref)
-
-
-    # Now that back-refs are done, we can move on to the current
-    # ref. We'll check for macros first then single word lines.
+    # Regex match groups are used for convenience.
     if match:
-        # Hunter is basically a "pre" hook, so if we want
-        # the value on the left hand side of the current
-        # expression we need to wait until the right hand
-        # side has actually been evaluated, otherwise we
-        # get stale or undefined values.
-        if match['assignment']:
-            # save it for lookup on the next line, this way
-            # we don't do another needless regex next run.
-            metadata['_brf'] = match['assignment']
-            BACK_REFS.append(metadata)
 
         # The simplest case is a variable, which we'll just
         # evaluate it directly.
         if match['variable']:
             value = try_eval(match['variable'], _globals, _locals, event=event)
 
-        # In the case of print, we evaluate and return the same
+        # In the case of "print", we evaluate and return the same
         # expression passed in.
         if match['print']:
             value = try_eval(match['print'], _globals, _locals, event=event)
 
-        if match['return']:
-            value = try_eval(match['return'], _globals, _locals, event=event)
-
-        if match['for']:
-            accum = []
-            loop_vars = match['for'].split(',')
-            for var in loop_vars:
-                accum.append(var)
-            metadata['_brf'] = accum
-            metadata['_loop'] = True
-            BACK_REFS.append(metadata)
-
-        if match['while']:
-            metadata['_brf'] = match['while']
-            metadata['_loop'] = True
-            BACK_REFS.append(metadata)
-
-        if match['function']:
-            value = try_eval(f'{match["function"]}(*[{match["args"]}])', _globals, _locals, event=event)
-
-    if value is not None:
-        # We only set the value if there is one, because the client
-        # will determine if it should decorate the line or not
-        # based on the existence of this field.
         metadata['value'] = resultifier(value)
 
     WOLF.append(metadata)
 
 
 def filename_filter(filename):
-    """ 
+    """
         Removes dependency noise from the output. We're only
         interested in code paths travelled by the target script,
         so this filter traces based on the filename, provided as
@@ -354,7 +257,7 @@ def filename_filter(filename):
 
 
 def import_and_trace_script(module_name, module_path):
-    """ 
+    """
         As the name suggests, this imports and traces the target script.
 
         Filters for the running script and delegates the resulting calls
@@ -368,7 +271,7 @@ def import_and_trace_script(module_name, module_path):
 
 
 def main(filename):
-    """ 
+    """
         Simply ensures the target script exists and calls
         the import_and_trace_script function. The results
         are stored in the global WOLF variable which are
@@ -415,8 +318,8 @@ def main(filename):
 
         """
     if not os.path.exists(filename):
-        print("EXISTS_ERROR: " + filename +
-              " <- file doesn't exist", file=sys.stderr)
+        message = f"EXISTS_ERROR: {filename} doesn't exist"
+        print(message, file=sys.stderr)
         return 1
 
     # The full path to the script (including filename and extension)
@@ -436,19 +339,19 @@ def main(filename):
         # If there's an error, we try to handle it and
         # send back data that can be used to decorate
         # the offending line.
-        # 
+        #
         # NOTE: I prefer the `repr(e)` over inspects object
         # repr, so I decided to use that instead.
-        exc_type, exc_value, exc_traceback = sys.exc_info()
+        _, _, exc_traceback = sys.exc_info()
         tb = traceback.extract_tb(exc_traceback)[-1]
         metadata = {
-            "line_number": tb[1],
-            "value": repr(e),
-            "error": True
+            "line_number":      tb[1],
+            "value":          repr(e),
+            "error":              True
         }
 
         # And tack the error on to our response.
-        WOLF.append(resultifier(metadata))
+        WOLF.append(metadata)
 
     if WOLF:
 

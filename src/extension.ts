@@ -205,10 +205,11 @@ export function activate(context: vscode.ExtensionContext) {
       }
       
       // TODO: Create a Wolf "OUTPUT" window
-      // console.log(data.toString('utf8'));
+      // console.log(JSON.stringify(lines, null, 4));
 
       const decorations: vscode.DecorationOptions[] = [];
       const annotations = {};
+
       // This is where we determine how each type will be
       // represented in the decoration.
       lines.forEach(element => {
@@ -216,9 +217,9 @@ export function activate(context: vscode.ExtensionContext) {
         const hasValue = element.hasOwnProperty('value');
         if (hasValue && element.kind === "line" || element.error) {
           if (Array.isArray(element.value)) {
-            value = "[" + element.value + "]";
+            value = "[" + element.value.join(', ') + "]";
           } else if (typeof element.value === "string") {
-            value = '"' + element.value + '"';
+            value = element.value;
           } else if (typeof element.value === "number") {
             value = element.value;
           } else if (typeof element.value === "object") {
@@ -258,7 +259,7 @@ export function activate(context: vscode.ExtensionContext) {
           range: line.range,
           renderOptions: {
             after: {
-              contentText: `${annotation.data}`,
+              contentText: annotation.data.join(' => '),
               fontWeight: "normal",
               fontStyle: "normal",
               color: annotation._error ? stopRed : cornflower

@@ -31,15 +31,15 @@ When done, press `F1` again, type wolf and select `Wolf: Stop all running wolves
 
 ----
 
-**Macros!**
-
-![macros-example](images/macros_example.png)
-
-----
-
 **Works inside functions!**
 
 ![functions-example](images/functions_example.png)
+
+----
+
+**And nested objects**
+
+![nested-example](images/nested_example.png)
 
 ----
 
@@ -53,6 +53,12 @@ When done, press `F1` again, type wolf and select `Wolf: Stop all running wolves
 
 ----
 
+**Highlights errors**
+
+![error-example](images/error_example.png)
+
+----
+
 **Works with http requests!**
 
 ![requests-example](images/requests_example.png)
@@ -61,6 +67,12 @@ When done, press `F1` again, type wolf and select `Wolf: Stop all running wolves
 before making requests with Wolf.
 
 ----
+
+----
+
+**Macros**
+
+Removed in v0.1.0 ~ See changlog
 
 ## Requirements
 
@@ -150,29 +162,43 @@ You can't get any better than _live feedback next to the code you're editing_!
 New Features
 ------------
 
-**New in v0.0.2**
 
-**Macros**
+> **New in v0.1.0**
 
-You can now use macros to turn on line annotations or
-trigger features like timers, type converters, etc..
-Macros are simply a 'hashtag' symbol, optionally
-followed by a single character "tag", and placed at the
-end of the line of code you wish to affect.
+**Much more stable**
 
-> Tags are used to customize the behavior of certain
-macros.
+The previous version of Wolf would crap out a lot due to some
+poor choices on my part. Essentially, I tried to make it do
+too much too soon. I felt that stabilty should come before
+shiny features and have adjusted accordingly. This really
+shouldn't affect usability, but if you have other thoughts
+please let me know. That feedback is important.
 
-Not all macros have tags; for example `Annotate` does
-not have any, and can be used by itself on a line.
 
-  - `#$` (Annotate)
+**Proper object printing**
 
-> NOTE: Timers/converters coming soon..
+Things like nested lists, sets, tuples.. etc, are now printed
+properly. Certain structures were flattened during printing
+during the last version and it was pretty frustrating, this
+should also be fixed but feel free to let me know if you find
+a way to break it.
 
-Example:
 
-![macros-example](images/macros_example.png)
+**Shows errors/exceptions**
+
+This was a quiet feature in the last release, so not totally
+new in 0.1.0. But it wasn't mentioned in the docs before so
+I'm making it official now.
+
+
+*Macros have been removed* ~ Until a more stable approach
+is found, comment macros have been removed.
+
+
+> **New in v0.0.2**
+
+**Macros** ~Removed in 0.1.0~
+
 
 **Auto evaluate print statements**
 
@@ -182,9 +208,7 @@ Example:
 
 ![print-example](images/print_example.png)
 
-
 ----
-
 
 
 ## I found a bug
