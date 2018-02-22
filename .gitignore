@@ -1,5 +1,6 @@
 out
 node_modules
+python_modules
 .vscode-test
 __pycache__
 build
