@@ -1,3 +1,6 @@
+from time import sleep
+
+
 def create_llist(*items):
     head = None
     for new_head in reversed(items):
@@ -7,5 +10,12 @@ def create_llist(*items):
 
 a = create_llist(1, 2, 3)
 
-a
 print(a)
+
+
+a = 1
+
+while True:
+    sleep(1)
+    print('Tick', a)
+    a += 1
