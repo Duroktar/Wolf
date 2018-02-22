@@ -163,6 +163,19 @@ New Features
 ------------
 
 
+> **New in v0.1.1**
+
+**Shortcut Icons**
+
+New shortcut buttons added to the action bar for easier
+starting and stopping.
+
+
+**Stability**
+
+Added a timeout to prevent locking and high cpu usage.
+
+
 > **New in v0.1.0**
 
 **Much more stable**
