@@ -1,11 +1,11 @@
 """ Wolf - It kicks the Quokkas ass.
-      .-"-.         
-     / /|  \                     _  __  
-    | <'/   |                   | |/ _| 
-     \/ (  /      __      _____ | | |_  
-     /_ |-'       \ \ /\ / / _ \| |  _| 
-    | _\\          \ V  V / (_) | | |    
-    \___>\          \_/\_/ \___/|_|_|                                 
+      .-"-.
+     / /|  \                     _  __
+    | <'/   |                   | |/ _|
+     \/ (  /      __      _____ | | |_
+     /_ |-'       \ \ /\ / / _ \| |  _|
+    | _\\          \ V  V / (_) | | |
+    \___>\          \_/\_/ \___/|_|_|
 
 Copyright 2018 Scott Doucet
 
@@ -25,8 +25,10 @@ import os
 import sys
 import re
 import json
+import signal
 import traceback
 from pprint import pformat
+from functools import wraps
 from importlib import util
 from contextlib import contextmanager
 
@@ -46,8 +48,6 @@ except ImportError:
 # want the expression being printed, if it's a
 # single variable, we want that.
 #
-# TODO: timer macro
-#
 # XXX: This will NOT work with destructured assignments.
 # Named search groups are returned for convenience:
 #   variable            <- the simplest case, a single variable
@@ -56,6 +56,35 @@ except ImportError:
 # NOTE: See https://regex101.com/r/uRio5u/1 for demo
 _macro_re = r'^(?!pass)(?P<variable>\w+)$|print\((?P<print>.+)\)'
 WOLF_MACROS = re.compile(_macro_re)
+
+
+# Slightly modified code taken from:
+# https://www.saltycrane.com/blog/2010/04/using-python-timeout-decorator-uploading-s3/
+class TimeoutError(Exception):
+    def __init__(self, value="Timed Out"):
+        self.value = value
+
+    def __str__(self):
+        return repr(self.value)
+
+
+def timeout(seconds_before_timeout):
+    def decorate(f):
+        def handler(signum, frame):
+            raise TimeoutError()
+
+        @wraps(f)
+        def new_f(*args, **kwargs):
+            old = signal.signal(signal.SIGALRM, handler)
+            signal.alarm(seconds_before_timeout)
+            try:
+                result = f(*args, **kwargs)
+            finally:
+                signal.signal(signal.SIGALRM, old)
+            signal.alarm(0)
+            return result
+        return new_f
+    return decorate
 ###########
 
 
@@ -270,6 +299,7 @@ def import_and_trace_script(module_name, module_path):
             import_file(module_name, module_path)
 
 
+@timeout(5)
 def main(filename):
     """
         Simply ensures the target script exists and calls
