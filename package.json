@@ -2,7 +2,7 @@
   "name": "wolf",
   "displayName": "Wolf",
   "description": "Python live scratchpad",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "traBpUkciP",
   "license": "Apache 2.0",
   "engines": {
@@ -15,13 +15,35 @@
     "commands": [
       {
         "command": "wolf.barkAtCurrentFile",
-        "title": "Wolf: Set the Wolf on the current file."
+        "title": "Wolf: Set the Wolf on the current file.",
+        "icon": {
+          "light": "./media/wolf-dark-blue.png",
+          "dark": "./media/wolf-dark-blue.png"
+        }
       },
       {
         "command": "wolf.stopBarking",
-        "title": "Wolf: Stops all running Wolf sessions."
+        "title": "Wolf: Stops all running Wolf sessions.",
+        "icon": {
+          "light": "./media/wolf-red.png",
+          "dark": "./media/wolf-red.png"
+        }
       }
-    ]
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "wolf.stopBarking",
+          "when": "editorLangId == python",
+          "group": "navigation"
+        },
+        {
+          "command": "wolf.barkAtCurrentFile",
+          "when": "editorLangId == python",
+          "group": "navigation"
+        }
+      ]
+    }
   },
   "repository": {
     "url": "https://github.com/Duroktar/Wolf"
@@ -37,7 +59,8 @@
     "vscode:prepublish": "tsc -p ./",
     "compile": "tsc -watch -p ./",
     "postinstall": "node ./node_modules/vscode/bin/install",
-    "test": "node ./node_modules/vscode/bin/test"
+    "test": "node ./node_modules/vscode/bin/test",
+    "ext:publish": "vsce publish"
   },
   "devDependencies": {
     "@types/mocha": "^2.2.32",

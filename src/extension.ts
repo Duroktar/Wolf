@@ -53,7 +53,7 @@ export function activate(context: vscode.ExtensionContext) {
       triggerUpdateDecorations();
     }
   );
-
+  
   const wolfStopCommand: Disposable = vscode.commands.registerCommand(
     "wolf.stopBarking",
     () => {
