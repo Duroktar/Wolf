@@ -1,0 +1,11 @@
+{
+    "name": "Wolf",
+    "author": "Scott Doucet",
+    "version": "0.1.0",
+    "scripts": {
+        "start": "python scripts/wolf.py scripts/test.py"
+    },
+    "dependencies": {
+        "hunter": "~=2.0.2"
+    }
+}
