@@ -63,6 +63,15 @@ export function activate(context: vscode.ExtensionContext) {
     return getActiveTextEditor().document.fileName;
   }
   
+  function setEnterWolfContext() {
+    vscode.commands.executeCommand('setContext', 'inWolfContext', true);
+  }
+
+  function setExitWolfContext() {
+    vscode.commands.executeCommand('setContext', 'inWolfContext', false);
+    
+  }
+
   const extPath = vscode.extensions.getExtension("traBpUkciP.wolf")
     .extensionPath;
 
@@ -72,6 +81,7 @@ export function activate(context: vscode.ExtensionContext) {
       const activeEditor: TextEditor = getActiveTextEditor();
       const current: string = getActiveFileName();
       activeSessions[path.basename(current)] = activeEditor;
+      setEnterWolfContext();
       triggerUpdateDecorations();
     }
   );
@@ -79,6 +89,7 @@ export function activate(context: vscode.ExtensionContext) {
   const wolfStopCommand: Disposable = vscode.commands.registerCommand(
     "wolf.stopBarking",
     () => {
+      setExitWolfContext();
       stopAndClearAllSessionDecorations();
     }
   );
@@ -94,6 +105,9 @@ export function activate(context: vscode.ExtensionContext) {
         activeSessions[path.basename(event.document.fileName)]
       ) {
         triggerUpdateDecorations();
+        setEnterWolfContext();
+      } else {
+        setExitWolfContext();
       }
     },
     null,
@@ -122,7 +136,7 @@ export function activate(context: vscode.ExtensionContext) {
   function _clearSessions() {
     activeSessions = {};
   }
-
+  
   function registerNewSession(editor: TextEditor) {
     const activeEditor: TextEditor = getActiveTextEditor();
     const current: string = getActiveFileName();
@@ -132,7 +146,7 @@ export function activate(context: vscode.ExtensionContext) {
   function removeSessionByName(name) {
     delete activeSessions[name];
   }
-
+  
   function stopSessionByName(name) {
     activeSessions[name].setDecorations(annotationDecoration, []);
     activeSessions[name].setDecorations(annotationDecorationError, []);

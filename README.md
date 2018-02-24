@@ -163,6 +163,21 @@ New Features
 ------------
 
 
+> **New in v0.1.2**
+
+**Gutter Icons**
+
+Colored notification icons in the gutter to aid in visual
+grepping of Wolf output. Error lines get a red icon while 
+okay lines get a green icon.
+
+
+**Shortcut Icons now a Single Toggle Button**
+
+The shortcut icons are now a single icon that senses whether
+Wolf is running on the current script and updates accordingly.
+
+
 > **New in v0.1.1**
 
 **Shortcut Icons**
