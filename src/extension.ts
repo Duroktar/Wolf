@@ -8,7 +8,9 @@ import {
   Extension,
   TextEditorDecorationType,
   Disposable,
-  MessageItem
+  MessageItem,
+  workspace,
+  Uri
 } from "vscode";
 
 const { spawn, spawnSync } = require("child_process");
@@ -24,12 +26,32 @@ function indexOfEnd(string, target) {
 let activeSessions = {};
 
 export function activate(context: vscode.ExtensionContext) {
+  
+  const redIcon = context.asAbsolutePath("media\\wolf-red.png").replace(/\\/g, "/");;
+  const greenIcon =  context.asAbsolutePath("media\\wolf-green.png").replace(/\\/g, "/");;
+
+  console.error(redIcon);
+  console.error(greenIcon);
+
   const annotationDecoration: TextEditorDecorationType = vscode.window.createTextEditorDecorationType(
     {
       after: {
         margin: "0 0 0 3em",
         textDecoration: "none"
-      }
+      },
+      gutterIconPath: greenIcon,
+      gutterIconSize: "cover"
+    } as DecorationRenderOptions
+  );
+
+  const annotationDecorationError: TextEditorDecorationType = vscode.window.createTextEditorDecorationType(
+    {
+      after: {
+        margin: "0 0 0 3em",
+        textDecoration: "none"
+      },
+      gutterIconPath: redIcon,
+      gutterIconSize: "cover"
     } as DecorationRenderOptions
   );
 
@@ -113,11 +135,13 @@ export function activate(context: vscode.ExtensionContext) {
 
   function stopSessionByName(name) {
     activeSessions[name].setDecorations(annotationDecoration, []);
+    activeSessions[name].setDecorations(annotationDecorationError, []);
   }
-
+  
   function clearEditorSessionDecorations(activeEditor: TextEditor) {
     const editorFileName: string = getActiveFileName();
     activeEditor.setDecorations(annotationDecoration, []);
+    activeEditor.setDecorations(annotationDecorationError, []);
   }
 
   function stopAndClearAllSessionDecorations() {
@@ -208,6 +232,7 @@ export function activate(context: vscode.ExtensionContext) {
       // console.log(JSON.stringify(lines, null, 4));
 
       const decorations: vscode.DecorationOptions[] = [];
+      const errorDecorations: vscode.DecorationOptions[] = [];
       const annotations = {};
 
       // This is where we determine how each type will be
@@ -262,15 +287,19 @@ export function activate(context: vscode.ExtensionContext) {
               contentText: annotation.data.join(' => '),
               fontWeight: "normal",
               fontStyle: "normal",
-              color: annotation._error ? stopRed : cornflower
+              color: annotation._error ? stopRed : cornflower,
             }
           } as DecorationRenderOptions
         } as DecorationOptions;
-
-        decorations.push(decoration);
+        if (annotation._error) {
+          errorDecorations.push(decoration);
+        } else {
+          decorations.push(decoration);
+        }
       });
 
       activeEditor.setDecorations(annotationDecoration, decorations);
+      activeEditor.setDecorations(annotationDecorationError, errorDecorations);
     });
   }
 }
