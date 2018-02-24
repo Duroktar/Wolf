@@ -2,7 +2,7 @@
   "name": "wolf",
   "displayName": "Wolf",
   "description": "Python live scratchpad",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publisher": "traBpUkciP",
   "license": "Apache-2.0",
   "engines": {
@@ -39,12 +39,12 @@
       "editor/title": [
         {
           "command": "wolf.stopBarking",
-          "when": "editorLangId == python",
+          "when": "inWolfContext",
           "group": "navigation"
         },
         {
           "command": "wolf.barkAtCurrentFile",
-          "when": "editorLangId == python",
+          "when": "editorLangId == python && !inWolfContext",
           "group": "navigation"
         }
       ]
