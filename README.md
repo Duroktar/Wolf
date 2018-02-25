@@ -159,44 +159,50 @@ You can't get any better than _live feedback next to the code you're editing_!
 
 ---
 
-## New Features
+## **New Features**
 
-> **New in v0.1.3**
+## v0.1.4 - patch
 
-**Sticky annotations during editing**
+### Better Stickys
+
+Better sticky handling during multi-line range edits and deletions.
+
+## v0.1.3 - updates
+
+### Sticky annotations during editing
 
 Annotations now stay attached to their line during editing and between
 saves. Multi line editing is supported as well. A page save is still
 necessary to update the values, this means the script is still only run
 when the file is manually saved.
 
-> **New in v0.1.2**
+## v0.1.2 - updates
 
-**Gutter Icons**
+### Gutter Icons
 
 Colored notification icons in the gutter to aid in visual
 grepping of Wolf output. Error lines get a red icon while
 okay lines get a green icon.
 
-**Shortcut Icons now a Single Toggle Button**
+### Shortcut Icons now a Single Toggle Button
 
 The shortcut icons are now a single icon that senses whether
 Wolf is running on the current script and updates accordingly.
 
-> **New in v0.1.1**
+## v0.1.1 - updates
 
-**Shortcut Icons**
+### Shortcut Icons
 
 New shortcut buttons added to the action bar for easier
 starting and stopping.
 
-**Stability**
+### Stability
 
 Added a timeout to prevent locking and high cpu usage.
 
-> **New in v0.1.0**
+## v0.1.0 - minor release
 
-**Much more stable**
+### Much more stable
 
 The previous version of Wolf would crap out a lot due to some
 poor choices on my part. Essentially, I tried to make it do
@@ -205,7 +211,7 @@ shiny features and have adjusted accordingly. This really
 shouldn't affect usability, but if you have other thoughts
 please let me know. That feedback is important.
 
-**Proper object printing**
+### Proper object printing
 
 Things like nested lists, sets, tuples.. etc, are now printed
 properly. Certain structures were flattened during printing
@@ -213,26 +219,29 @@ during the last version and it was pretty frustrating, this
 should also be fixed but feel free to let me know if you find
 a way to break it.
 
-**Shows errors/exceptions**
+### Shows errors/exceptions
 
 This was a quiet feature in the last release, so not totally
 new in 0.1.0. But it wasn't mentioned in the docs before so
 I'm making it official now.
 
-_Macros have been removed_ ~ Until a more stable approach
-is found, comment macros have been removed.
+### Macros
 
-> **New in v0.0.2**
+\* _Removed_ - _Will possibly be re-implemented in a later version_
 
-**Macros** ~Removed in 0.1.0~
+## v0.0.2 - updates
 
-**Auto evaluate print statements**
+> Macros ~Removed in 0.1.0~
 
-Wolf now automatically evaluates `print` statements/functions
+### Auto evaluate print statements
 
-Example:
+Wolf now automatically adds annotations for `print` function calls.
 
-![print-example](images/print_example.png)
+**Macros** ~ _Removed in 0.1.0_
+
+## v0.0.1 - initial release
+
+First release of the Wolf. :tada:
 
 ---
 

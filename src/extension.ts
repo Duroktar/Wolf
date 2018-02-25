@@ -289,7 +289,6 @@ export function activate(context: vscode.ExtensionContext) {
     const scriptDir: string = path.dirname(scriptName);
 
     const wolfPath: string = path.join(extPath, "scripts/wolf.py");
-    // const python = spawn("python", [wolfPath, scriptName], { cwd: scriptDir });
     const python = spawn("python", [wolfPath, scriptName]);
 
     python.stderr.on("data", data => {
@@ -403,56 +402,95 @@ export function activate(context: vscode.ExtensionContext) {
         if (event.document.lineCount > activeEditorCountLine) {
           // Added lines
           if (startIndex >= activeDocument.lineAt(editLineNo).text.length) {
-            shiftDown(editLineNo + 1, activeEditorCountLine - 1, false);
+            shiftDown({
+              start: editLineNo + 1,
+              end: activeEditorCountLine - 1,
+              swap: false
+            });
           } else if (startIndex === 0) {
-            shiftDown(editLineNo, activeEditorCountLine - 1, false);
+            shiftDown({
+              start: editLineNo,
+              end: activeEditorCountLine - 1,
+              swap: false
+            });
           } else {
-            shiftDown(editLineNo + 1, activeEditorCountLine - 1, false);
+            // Same as first if, but delete first annotation at end
+            shiftDown({
+              start: editLineNo + 1,
+              end: activeEditorCountLine - 1,
+              swap: false
+            });
             delete annotations[editLineNo];
           }
         } else if (event.document.lineCount < activeEditorCountLine) {
-          // Removed lines
-          shiftUp(editLineNo, activeEditorCountLine - 1, false);
+          // Lines were removed
+          const startLine = event.contentChanges[0].range.start.line;
+          const endLine = event.contentChanges[0].range.end.line;
+          const diff = endLine - startLine;
+          if (diff !== 0 || event.contentChanges[0].text.length !== 0) {
+            if (event.contentChanges[0].range.start.character === 0) {
+              removeDecorationLines(startLine, endLine);
+            } else {
+              removeDecorationLines(startLine + 1, endLine);
+            }
+          }
         }
       } else if (source.trim() !== activeDocument.lineAt(endLine).text.trim()) {
         delete annotations[editLineNo];
       }
-      activeEditorCountLine = event.document.lineCount;
       createDecorations();
     } else if (event.contentChanges.length === 2) {
-      activeEditorCountLine = event.document.lineCount;
       if (activeEditor.selections.length === 1) {
         const start: number = event.contentChanges[1].range.end.line;
         const end: number = event.contentChanges[0].range.end.line;
         if (event.contentChanges[0].text === "") {
-          shiftDown(start + 1, end + 1);
+          shiftDown({ start: start + 1, end: end + 1 });
         } else if (event.contentChanges[1].text === "") {
-          shiftUp(start, end + 1);
+          shiftUp({ start, end: end + 1 });
         }
         createDecorations();
       }
     }
+    activeEditorCountLine = event.document.lineCount;
   }
 
-  function shiftDown(start: number, end: number, swap: boolean = true) {
+  function removeDecorationLines(start: number, end: number) {
+    for (let index = start + 1; index <= end + 1; index++) {
+      delete annotations[index];
+    }
+    shiftUp({ start: start + 1, swap: false, step: end - start });
+  }
+
+  function shiftDown({ start, end = -1, swap = true, step = 1 }) {
     const nextAnnotations = {};
     Object.keys(annotations).forEach(key => {
       const intKey = parseInt(key, 10);
-      const nextKey = intKey >= start && intKey <= end ? intKey + 1 : intKey;
+      let nextKey;
+      if (end !== -1) {
+        nextKey = start <= intKey && intKey <= end ? intKey + step : intKey;
+      } else {
+        nextKey = start <= intKey ? intKey + step : intKey;
+      }
       nextAnnotations[nextKey] = { ...annotations[key] };
     });
     if (swap) {
       nextAnnotations[start] = { ...annotations[end] };
       nextAnnotations[end + 1] = { ...annotations[end + 1] };
     }
+
     annotations = { ...nextAnnotations };
   }
 
-  function shiftUp(start: number, end: number, swap: boolean = true) {
+  function shiftUp({ start, end = -1, swap = true, step = 1 }) {
     const nextAnnotations = {};
     Object.keys(annotations).forEach(key => {
       const intKey = parseInt(key, 10);
-      const nextKey = intKey >= start && intKey <= end ? intKey - 1 : intKey;
+      let nextKey;
+      if (end !== -1) {
+        nextKey = start <= intKey && intKey <= end ? intKey - step : intKey;
+      } else {
+        nextKey = start <= intKey ? intKey - step : intKey;
+      }
       nextAnnotations[nextKey] = { ...annotations[key] };
     });
     if (swap) {
