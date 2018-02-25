@@ -233,7 +233,7 @@ def result_handler(event):
         "line_number":        event['lineno'],
         "kind":                 event['kind'],
         "depth":               event['depth'],
-        "source":             event['source'],
+        "source":     event['source'].strip(),
         # "value"      <-  Defined below MAYBE..
     }
 
