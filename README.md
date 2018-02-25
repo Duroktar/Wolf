@@ -29,19 +29,19 @@ When done, press `F1` again, type wolf and select `Wolf: Stop all running wolves
 > name and not an expression; the annotations (16)
 > cannot be edited.
 
-----
+---
 
 **Works inside functions!**
 
 ![functions-example](images/functions_example.png)
 
-----
+---
 
 **And nested objects**
 
 ![nested-example](images/nested_example.png)
 
-----
+---
 
 **Works with loops ..**
 
@@ -51,24 +51,24 @@ When done, press `F1` again, type wolf and select `Wolf: Stop all running wolves
 
 ![recursion-example](images/recursion_example.png)
 
-----
+---
 
 **Highlights errors**
 
 ![error-example](images/error_example.png)
 
-----
+---
 
 **Works with http requests!**
 
 ![requests-example](images/requests_example.png)
 
 > NOTE: Please see FAQ section "Will APIs Hate Me?"
-before making requests with Wolf.
+> before making requests with Wolf.
 
-----
+---
 
-----
+---
 
 **Macros**
 
@@ -159,24 +159,29 @@ You can't get any better than _live feedback next to the code you're editing_!
 
 ---
 
-New Features
-------------
+## New Features
 
+> **New in v0.1.3**
+
+**Sticky annotations during editing**
+
+Annotations now stay attached to their line during editing and between
+saves. Multi line editing is supported as well. A page save is still
+necessary to update the values, this means the script is still only run
+when the file is manually saved.
 
 > **New in v0.1.2**
 
 **Gutter Icons**
 
 Colored notification icons in the gutter to aid in visual
-grepping of Wolf output. Error lines get a red icon while 
+grepping of Wolf output. Error lines get a red icon while
 okay lines get a green icon.
-
 
 **Shortcut Icons now a Single Toggle Button**
 
 The shortcut icons are now a single icon that senses whether
 Wolf is running on the current script and updates accordingly.
-
 
 > **New in v0.1.1**
 
@@ -185,11 +190,9 @@ Wolf is running on the current script and updates accordingly.
 New shortcut buttons added to the action bar for easier
 starting and stopping.
 
-
 **Stability**
 
 Added a timeout to prevent locking and high cpu usage.
-
 
 > **New in v0.1.0**
 
@@ -202,7 +205,6 @@ shiny features and have adjusted accordingly. This really
 shouldn't affect usability, but if you have other thoughts
 please let me know. That feedback is important.
 
-
 **Proper object printing**
 
 Things like nested lists, sets, tuples.. etc, are now printed
@@ -211,22 +213,18 @@ during the last version and it was pretty frustrating, this
 should also be fixed but feel free to let me know if you find
 a way to break it.
 
-
 **Shows errors/exceptions**
 
 This was a quiet feature in the last release, so not totally
 new in 0.1.0. But it wasn't mentioned in the docs before so
 I'm making it official now.
 
-
-*Macros have been removed* ~ Until a more stable approach
+_Macros have been removed_ ~ Until a more stable approach
 is found, comment macros have been removed.
-
 
 > **New in v0.0.2**
 
 **Macros** ~Removed in 0.1.0~
-
 
 **Auto evaluate print statements**
 
@@ -236,8 +234,7 @@ Example:
 
 ![print-example](images/print_example.png)
 
-----
-
+---
 
 ## I found a bug
 
