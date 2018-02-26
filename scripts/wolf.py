@@ -71,14 +71,18 @@ class TimeoutError(Exception):
 
 
 def timeout(seconds_before_timeout):
+    _timeout_err = TimeoutError('Wolf timed out after [%s seconds] exceeded!' %
+                                seconds_before_timeout)
 
-    # windows does not support SIGALRM so we have to use a custom decorator :/
     if(os.name == 'nt'):
-        # windows decorator adapted from https://stackoverflow.com/questions/21827874/timeout-a-python-function-in-windows
+        # windows does not support SIGALRM so we have to use a custom decorator :/
+        # adapted from https://stackoverflow.com/questions/21827874/timeout-a-python-function-in-windows
+        # Added v0.1.4 by Almenon
         def deco(func):
             @functools.wraps(func)
             def wrapper(*args, **kwargs):
-                res = [Exception('function [%s] timeout [%s seconds] exceeded!' % (func.__name__, seconds_before_timeout))]
+                res = [_timeout_err]
+
                 def newFunc():
                     try:
                         res[0] = func(*args, **kwargs)
@@ -90,7 +94,7 @@ def timeout(seconds_before_timeout):
                     t.start()
                     t.join(seconds_before_timeout)
                 except Exception as e:
-                    print('error starting thread')
+                    print('THREAD_ERROR: error starting thread', file=sys.stderr)
                     raise e
                 ret = res[0]
                 if isinstance(ret, BaseException):
@@ -99,10 +103,10 @@ def timeout(seconds_before_timeout):
             return wrapper
         return deco
 
-    else: # mac / linux
+    else:  # mac / linux
         def decorate(f):
             def handler(signum, frame):
-                raise TimeoutError()
+                raise _timeout_err
 
             @wraps(f)
             def new_f(*args, **kwargs):
@@ -316,6 +320,7 @@ def filename_filter(filename):
     return lambda event: bool(event['filename'] == filename)
 
 
+@timeout(5)
 def import_and_trace_script(module_name, module_path):
     """
         As the name suggests, this imports and traces the target script.
@@ -330,7 +335,6 @@ def import_and_trace_script(module_name, module_path):
             import_file(module_name, module_path)
 
 
-@timeout(5)
 def main(filename):
     """
         Simply ensures the target script exists and calls
@@ -358,6 +362,8 @@ def main(filename):
 
             -> `RUNTIME_ERROR:` Captures runtime errors from the main function.
 
+            -> `THREAD_ERROR:` Captures errors from the Windows timeout thread.
+
         On success:
 
             -> `WOOF:` a string search for this tag returns the
@@ -379,7 +385,7 @@ def main(filename):
 
         """
     if not os.path.exists(filename):
-        message = "EXISTS_ERROR: "+filename+" doesn't exist"
+        message = "EXISTS_ERROR: " + filename + " doesn't exist"
         print(message, file=sys.stderr)
         return 1
 
