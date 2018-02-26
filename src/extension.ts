@@ -20,15 +20,19 @@ import {
 const { spawn, spawnSync } = require("child_process");
 
 export function activate(context: vscode.ExtensionContext) {
+  const wolfConfig = vscode.workspace.getConfiguration("wolf");
+
   const cornflower = "#6495ed";
   const stopRed = "#ea2f36";
 
+  const pawprints = wolfConfig.get("pawPrintsInGutter");
+
   const redIcon = context
-    .asAbsolutePath("media\\wolf-red.png")
+    .asAbsolutePath(`media\\wolf${pawprints ? "-paw" : ""}-red.png`)
     .replace(/\\/g, "/");
 
   const greenIcon = context
-    .asAbsolutePath("media\\wolf-green.png")
+    .asAbsolutePath(`media\\wolf${pawprints ? "-paw" : ""}-green.png`)
     .replace(/\\/g, "/");
 
   interface WolfSessions {
@@ -81,32 +85,46 @@ export function activate(context: vscode.ExtensionContext) {
   const extPath: string = vscode.extensions.getExtension("traBpUkciP.wolf")
     .extensionPath;
 
+  function startWolf() {
+    const activeEditor: TextEditor = getActiveTextEditor();
+    const current: string = getActiveFileName();
+    activeSessions[path.basename(current)] = activeEditor;
+    activeEditorCountLine = activeEditor.document.lineCount;
+    setEnterWolfContext();
+    triggerUpdateDecorations();
+  }
+
+  function stopWolf() {
+    setExitWolfContext();
+    stopAndClearAllSessionDecorations();
+  }
+
   const wolfStartCommand: Disposable = vscode.commands.registerCommand(
     "wolf.barkAtCurrentFile",
-    () => {
-      const activeEditor: TextEditor = getActiveTextEditor();
-      const current: string = getActiveFileName();
-      activeSessions[path.basename(current)] = activeEditor;
-      activeEditorCountLine = activeEditor.document.lineCount;
-      setEnterWolfContext();
-      triggerUpdateDecorations();
-    }
+    startWolf
   );
 
   const wolfStopCommand: Disposable = vscode.commands.registerCommand(
     "wolf.stopBarking",
-    () => {
-      setExitWolfContext();
-      stopAndClearAllSessionDecorations();
-    }
+    stopWolf
   );
 
-  function pushSubscribers() {
-    context.subscriptions.push(wolfStartCommand);
-    context.subscriptions.push(wolfStopCommand);
-  }
+  const wolfStartAction: Disposable = vscode.commands.registerCommand(
+    "wolf.touchBarStart",
+    startWolf
+  );
 
-  pushSubscribers();
+  const wolfStopAction: Disposable = vscode.commands.registerCommand(
+    "wolf.touchBarStop",
+    stopWolf
+  );
+
+  // context.subscriptions.push(
+  //   wolfStartAction,
+  //   wolfStartCommand,
+  //   wolfStopCommand,
+  //   wolfStopAction
+  // );
 
   function isActiveSession(document: TextDocument) {
     const activeEditor: TextEditor = getActiveTextEditor();
@@ -398,7 +416,6 @@ export function activate(context: vscode.ExtensionContext) {
     return endPos.isEqual(otherPos);
   }
 
-  // function used to attach bookmarks at the line
   function updateStickyDecorations(event: TextDocumentChangeEvent) {
     const activeEditor: TextEditor = getActiveTextEditor();
 
@@ -427,8 +444,10 @@ export function activate(context: vscode.ExtensionContext) {
                 delete annotations[end.line + 1];
               }
             }
+            let bias = start.character === 0 && end.character === 0 ? 1 : 2;
+
             shiftDown({
-              start: end.line + 2,
+              start: end.line + bias,
               swap: false,
               step: diff
             });
