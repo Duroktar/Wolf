@@ -8,8 +8,13 @@
   "engines": {
     "vscode": "^1.12.0"
   },
-  "categories": ["Debuggers", "Other"],
-  "activationEvents": ["onCommand:wolf.barkAtCurrentFile"],
+  "categories": [
+    "Debuggers",
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:wolf.barkAtCurrentFile"
+  ],
   "main": "./out/src/extension",
   "contributes": {
     "commands": [
