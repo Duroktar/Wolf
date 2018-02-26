@@ -348,7 +348,7 @@ def main(filename):
 
         """
     if not os.path.exists(filename):
-        message = f"EXISTS_ERROR: {filename} doesn't exist"
+        message = "EXISTS_ERROR: "+filename+" doesn't exist"
         print(message, file=sys.stderr)
         return 1
 
