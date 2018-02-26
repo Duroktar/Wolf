@@ -31,6 +31,8 @@ from pprint import pformat
 from functools import wraps
 from importlib import util
 from contextlib import contextmanager
+import functools
+from threading import Thread
 
 try:
     from hunter import trace
@@ -69,22 +71,51 @@ class TimeoutError(Exception):
 
 
 def timeout(seconds_before_timeout):
-    def decorate(f):
-        def handler(signum, frame):
-            raise TimeoutError()
 
-        @wraps(f)
-        def new_f(*args, **kwargs):
-            old = signal.signal(signal.SIGALRM, handler)
-            signal.alarm(seconds_before_timeout)
-            try:
-                result = f(*args, **kwargs)
-            finally:
-                signal.signal(signal.SIGALRM, old)
-            signal.alarm(0)
-            return result
-        return new_f
-    return decorate
+    # windows does not support SIGALRM so we have to use a custom decorator :/
+    if(os.name == 'nt'):
+        # windows decorator adapted from https://stackoverflow.com/questions/21827874/timeout-a-python-function-in-windows
+        def deco(func):
+            @functools.wraps(func)
+            def wrapper(*args, **kwargs):
+                res = [Exception('function [%s] timeout [%s seconds] exceeded!' % (func.__name__, seconds_before_timeout))]
+                def newFunc():
+                    try:
+                        res[0] = func(*args, **kwargs)
+                    except Exception as e:
+                        res[0] = e
+                t = Thread(target=newFunc)
+                t.daemon = True
+                try:
+                    t.start()
+                    t.join(seconds_before_timeout)
+                except Exception as e:
+                    print('error starting thread')
+                    raise e
+                ret = res[0]
+                if isinstance(ret, BaseException):
+                    raise ret
+                return ret
+            return wrapper
+        return deco
+
+    else: # mac / linux
+        def decorate(f):
+            def handler(signum, frame):
+                raise TimeoutError()
+
+            @wraps(f)
+            def new_f(*args, **kwargs):
+                old = signal.signal(signal.SIGALRM, handler)
+                signal.alarm(seconds_before_timeout)
+                try:
+                    result = f(*args, **kwargs)
+                finally:
+                    signal.signal(signal.SIGALRM, old)
+                signal.alarm(0)
+                return result
+            return new_f
+        return decorate
 ###########
 
 
