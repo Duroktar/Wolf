@@ -3,6 +3,20 @@
   "version": "0.1.0",
   "configurations": [
       {
+          "name": "Python",
+          "type": "python",
+          "request": "launch",
+          "stopOnEntry": true,
+          "pythonPath": "${config:python.pythonPath}",
+          "program": "${file}",
+          "cwd": "${workspaceFolder}",
+          "env": {},
+          "envFile": "${workspaceFolder}/.env",
+          "debugOptions": [
+              "RedirectOutput"
+          ]
+      },
+      {
           "name": "Launch Extension",
           "type": "extensionHost",
           "request": "launch",
