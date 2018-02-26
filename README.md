@@ -154,6 +154,8 @@ You can't get any better than _live feedback next to the code you're editing_!
 
 ## **Changelog**
 
+## v0.1.6.patch ~ Minor updates to sticky handling
+
 ## v0.1.5
 
 ### Windows Support/Fix
