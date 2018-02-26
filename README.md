@@ -13,15 +13,13 @@ Wolf is Good for:
 
 ## Usage
 
-Press `F1`, type `wolf`, and select `Wolf: Set the wolf on the current file.`
-
-> PROTIP: Code annotations are updated on file save.
-
-When done, press `F1` again, type wolf and select `Wolf: Stop all running wolves.`
+Click the blue Wolf in the upper right action bar inside any open Python source
+file to start a session. Once inside a running session, the Wolf icon will change
+color to red and can be clicked again to stop the session.
 
 ## Features
 
-**Check out variables inline!**
+### Check out variables inline
 
 ![basic-example](images/basic_example.png)
 
@@ -31,35 +29,35 @@ When done, press `F1` again, type wolf and select `Wolf: Stop all running wolves
 
 ---
 
-**Works inside functions!**
+### Works inside functions!
 
 ![functions-example](images/functions_example.png)
 
 ---
 
-**And nested objects**
+### And nested objects
 
 ![nested-example](images/nested_example.png)
 
 ---
 
-**Works with loops ..**
+### Works with loops
 
 ![loops-example](images/loops_example.png)
 
-**and recursion!**
+### and recursion
 
 ![recursion-example](images/recursion_example.png)
 
 ---
 
-**Highlights errors**
+### Highlights errors
 
 ![error-example](images/error_example.png)
 
 ---
 
-**Works with http requests!**
+### Works with http requests!
 
 ![requests-example](images/requests_example.png)
 
@@ -68,15 +66,10 @@ When done, press `F1` again, type wolf and select `Wolf: Stop all running wolves
 
 ---
 
----
-
-**Macros**
-
-Removed in v0.1.0 ~ See changlog
-
 ## Requirements
 
-* Python 3.6 <- This is currently a hard requirement
+* Visual Studio Code
+* Python 3.5 - 3.6
 * `Hunter` library, available on
   PyPi.
 
@@ -99,7 +92,7 @@ This extension contributes the following settings:
 
 Abso-fucking-lutely.
 
-### I don't see any annotations..
+### I don't see any annotations
 
 Make sure to save the file you're working on, and that Wolf is activated.
 You can try stopping and starting Wolf again on the file to see if this
@@ -159,7 +152,19 @@ You can't get any better than _live feedback next to the code you're editing_!
 
 ---
 
-## **New Features**
+## **Changelog**
+
+## v0.1.5
+
+### Windows Support/Fix
+
+Windows does not support SIGALRM so a custom decorator was provided by Almenon.
+
+### Python 3.5 Support
+
+Newly added support for Python 3.5 was also provided by Almenon.
+
+_Thanks for contributing to Wolf, Almenon!_ :tada:
 
 ## v0.1.4 - patch
 
@@ -199,6 +204,8 @@ starting and stopping.
 ### Stability
 
 Added a timeout to prevent locking and high cpu usage.
+
+> Bug: This introduced a bug in Windows which was fixed in v0.1.5
 
 ## v0.1.0 - minor release
 
@@ -254,6 +261,12 @@ You mean a flea? Report any fleas in the issue tracker, please!
 That would be awesome. You can shoot me an email or submit a PR. I'm also on
 reddit at `/u/Duroktar`. Also, there's plenty of documentation to get started
 on your own, if you just want to do that. Welcome one, welcome all!
+
+## Contributors
+
+The following people have contributed to Wolf:
+
+[Almenon](https://github.com/Almenon) - Windows fix and Python 3.5 support ~ [#3](https://github.com/Duroktar/Wolf/pull/3)
 
 ## License
 

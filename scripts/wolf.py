@@ -31,6 +31,8 @@ from pprint import pformat
 from functools import wraps
 from importlib import util
 from contextlib import contextmanager
+import functools
+from threading import Thread
 
 try:
     from hunter import trace
@@ -69,22 +71,55 @@ class TimeoutError(Exception):
 
 
 def timeout(seconds_before_timeout):
-    def decorate(f):
-        def handler(signum, frame):
-            raise TimeoutError()
+    _timeout_err = TimeoutError('Wolf timed out after [%s seconds] exceeded!' %
+                                seconds_before_timeout)
 
-        @wraps(f)
-        def new_f(*args, **kwargs):
-            old = signal.signal(signal.SIGALRM, handler)
-            signal.alarm(seconds_before_timeout)
-            try:
-                result = f(*args, **kwargs)
-            finally:
-                signal.signal(signal.SIGALRM, old)
-            signal.alarm(0)
-            return result
-        return new_f
-    return decorate
+    if(os.name == 'nt'):
+        # windows does not support SIGALRM so we have to use a custom decorator :/
+        # adapted from https://stackoverflow.com/questions/21827874/timeout-a-python-function-in-windows
+        # Added v0.1.4 by Almenon
+        def deco(func):
+            @functools.wraps(func)
+            def wrapper(*args, **kwargs):
+                res = [_timeout_err]
+
+                def newFunc():
+                    try:
+                        res[0] = func(*args, **kwargs)
+                    except Exception as e:
+                        res[0] = e
+                t = Thread(target=newFunc)
+                t.daemon = True
+                try:
+                    t.start()
+                    t.join(seconds_before_timeout)
+                except Exception as e:
+                    print('THREAD_ERROR: error starting thread', file=sys.stderr)
+                    raise e
+                ret = res[0]
+                if isinstance(ret, BaseException):
+                    raise ret
+                return ret
+            return wrapper
+        return deco
+
+    else:  # mac / linux
+        def decorate(f):
+            def handler(signum, frame):
+                raise _timeout_err
+
+            @wraps(f)
+            def new_f(*args, **kwargs):
+                old = signal.signal(signal.SIGALRM, handler)
+                signal.alarm(seconds_before_timeout)
+                try:
+                    result = f(*args, **kwargs)
+                finally:
+                    signal.signal(signal.SIGALRM, old)
+                signal.alarm(0)
+                return result
+            return new_f
+        return decorate
 ###########
 
 
@@ -285,6 +320,7 @@ def filename_filter(filename):
     return lambda event: bool(event['filename'] == filename)
 
 
+@timeout(5)
 def import_and_trace_script(module_name, module_path):
     """
         As the name suggests, this imports and traces the target script.
@@ -299,7 +335,6 @@ def import_and_trace_script(module_name, module_path):
             import_file(module_name, module_path)
 
 
-@timeout(5)
 def main(filename):
     """
         Simply ensures the target script exists and calls
@@ -327,6 +362,8 @@ def main(filename):
 
             -> `RUNTIME_ERROR:` Captures runtime errors from the main function.
 
+            -> `THREAD_ERROR:` Captures errors from the Windows timeout thread.
+
         On success:
 
             -> `WOOF:` a string search for this tag returns the
@@ -348,7 +385,7 @@ def main(filename):
 
         """
     if not os.path.exists(filename):
-        message = f"EXISTS_ERROR: {filename} doesn't exist"
+        message = "EXISTS_ERROR: " + filename + " doesn't exist"
         print(message, file=sys.stderr)
         return 1
 
