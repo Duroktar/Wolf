@@ -286,6 +286,7 @@ def result_handler(event):
     # This regex does all the heavy lifting. Check out
     # https://regex101.com/r/npWf6w/5 for an example of
     # # how it works.
+    print(source, file=sys.stderr)
     match = WOLF_MACROS.search(source)
 
     # Regex match groups are used for convenience.

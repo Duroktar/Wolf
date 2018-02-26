@@ -385,6 +385,19 @@ export function activate(context: vscode.ExtensionContext) {
     });
   }
 
+  function annotatedLineIsChanged(
+    document: TextDocument,
+    lineno: number
+  ): boolean {
+    const source: string = { ...annotations[lineno + 1] }._source || "";
+    return source.trim() !== document.lineAt(lineno).text.trim();
+  }
+
+  function isLastCharacterInLine(endPos: Position, document: TextDocument) {
+    const otherPos: Position = document.lineAt(endPos.line).range.end;
+    return endPos.isEqual(otherPos);
+  }
+
   // function used to attach bookmarks at the line
   function updateStickyDecorations(event: TextDocumentChangeEvent) {
     const activeEditor: TextEditor = getActiveTextEditor();
@@ -397,50 +410,73 @@ export function activate(context: vscode.ExtensionContext) {
       const editLineNo: number = endLine + 1;
 
       const source: string = { ...annotations[editLineNo] }._source || "";
+      const { range, range: { start, end }, text } = event.contentChanges[0];
 
       if (event.document.lineCount != activeEditorCountLine) {
         if (event.document.lineCount > activeEditorCountLine) {
+          const diff = event.document.lineCount - activeEditorCountLine;
           // Added lines
-          if (startIndex >= activeDocument.lineAt(editLineNo).text.length) {
+          if (event.contentChanges[0].text.startsWith("\n")) {
+            if (start.character > 0) {
+              if (annotatedLineIsChanged(activeDocument, start.line + 1)) {
+                delete annotations[start.line + 1];
+              }
+            }
+            if (end.character > 0) {
+              if (annotatedLineIsChanged(activeDocument, end.line + 1)) {
+                delete annotations[end.line + 1];
+              }
+            }
             shiftDown({
-              start: editLineNo + 1,
-              end: activeEditorCountLine - 1,
-              swap: false
+              start: start.line + 1,
+              swap: false,
+              step: diff
             });
-          } else if (startIndex === 0) {
-            shiftDown({
-              start: editLineNo,
-              end: activeEditorCountLine - 1,
-              swap: false
-            });
-          } else {
-            // Same as first if, but delete first annotation at end
-            shiftDown({
-              start: editLineNo + 1,
-              end: activeEditorCountLine - 1,
-              swap: false
-            });
-            delete annotations[editLineNo];
           }
         } else if (event.document.lineCount < activeEditorCountLine) {
-          // Lines were removed
-          const startLine = event.contentChanges[0].range.start.line;
-          const endLine = event.contentChanges[0].range.end.line;
-          const diff = endLine - startLine;
-          if (diff !== 0 || event.contentChanges[0].text.length !== 0) {
-            if (event.contentChanges[0].range.start.character === 0) {
-              removeDecorationLines(startLine, endLine);
+          const diff = activeEditorCountLine - event.document.lineCount;
+          //                     vvv  NOTE: Won't this always be an empty string...
+          if (diff === 1 && text === "") {
+            // CASE: Only a single line affected
+            if (start.character === 0 && end.character === 0) {
+              // Delete/Backspace an empty line to end of empty line
+              removeDecorationLines(start.line, start.line, 1);
+            } else if (start.character > 0 && end.character === 0) {
+              // Delete/Backspace an empty line to the end of non empty line
+              if (annotatedLineIsChanged(activeDocument, start.line + 1)) {
+                removeDecorationLines(start.line, end.line);
+              } else {
+                removeDecorationLines(end.line, end.line, 1);
+              }
+            }
+          } else {
+            // CASE: Multiple lines affected
+            if (start.character === 0) {
+              // edit beginning IS AT the start of a line
+              if (end.character === 0) {
+                // edit ending IS AT the start of a line  (delete annotation on that line)
+                removeDecorationLines(start.line, start.line, 1);
+              } else {
+                // edit ending NOT AT the start of a line (delete annotations on all affected lines)
+                removeDecorationLines(start.line, end.line);
+              }
             } else {
-              removeDecorationLines(startLine + 1, endLine);
+              // edit beginning NOT AT start of a line
+              removeDecorationLines(start.line + 1, end.line);
             }
           }
         }
-      } else if (source.trim() !== activeDocument.lineAt(endLine).text.trim()) {
-        delete annotations[editLineNo];
+      } else if (range.isSingleLine) {
+        if (annotatedLineIsChanged(activeDocument, endLine)) {
+          // same line edit that changed the original characters (delete annotation on that line)
+          delete annotations[editLineNo];
+        }
       }
       createDecorations();
     } else if (event.contentChanges.length === 2) {
+      // Multi line edit
       if (activeEditor.selections.length === 1) {
+        // whats this for?
         const start: number = event.contentChanges[1].range.end.line;
         const end: number = event.contentChanges[0].range.end.line;
         if (event.contentChanges[0].text === "") {
@@ -454,11 +490,11 @@ export function activate(context: vscode.ExtensionContext) {
     activeEditorCountLine = event.document.lineCount;
   }
 
-  function removeDecorationLines(start: number, end: number) {
+  function removeDecorationLines(start: number, end: number, step?: number) {
     for (let index = start + 1; index <= end + 1; index++) {
       delete annotations[index];
     }
-    shiftUp({ start: start + 1, swap: false, step: end - start });
+    shiftUp({ start: start + 1, swap: false, step: step || end - start });
   }
 
   function shiftDown({ start, end = -1, swap = true, step = 1 }) {
