@@ -418,36 +418,42 @@ export function activate(context: vscode.ExtensionContext) {
           // Added lines
           if (event.contentChanges[0].text.startsWith("\n")) {
             if (start.character > 0) {
-              if (annotatedLineIsChanged(activeDocument, start.line + 1)) {
+              if (annotatedLineIsChanged(activeDocument, start.line)) {
                 delete annotations[start.line + 1];
               }
             }
             if (end.character > 0) {
-              if (annotatedLineIsChanged(activeDocument, end.line + 1)) {
+              if (annotatedLineIsChanged(activeDocument, end.line)) {
                 delete annotations[end.line + 1];
               }
             }
             shiftDown({
-              start: start.line + 1,
+              start: end.line + 2,
               swap: false,
               step: diff
             });
           }
         } else if (event.document.lineCount < activeEditorCountLine) {
           const diff = activeEditorCountLine - event.document.lineCount;
-          //                     vvv  NOTE: Won't this always be an empty string...
+          //                     vvv  NOTE: Won't this always be an empty string?
           if (diff === 1 && text === "") {
             // CASE: Only a single line affected
             if (start.character === 0 && end.character === 0) {
               // Delete/Backspace an empty line to end of empty line
               removeDecorationLines(start.line, start.line, 1);
-            } else if (start.character > 0 && end.character === 0) {
-              // Delete/Backspace an empty line to the end of non empty line
-              if (annotatedLineIsChanged(activeDocument, start.line + 1)) {
-                removeDecorationLines(start.line, end.line);
-              } else {
-                removeDecorationLines(end.line, end.line, 1);
+            } else {
+              if (start.character > 0) {
+                // Delete/Backspace an empty line to the end of non empty line
+                if (annotatedLineIsChanged(activeDocument, start.line)) {
+                  delete annotations[start.line + 1];
+                }
               }
+              if (end.character > 0) {
+                if (annotatedLineIsChanged(activeDocument, end.line)) {
+                  delete annotations[end.line + 1];
+                }
+              }
+              shiftUp({ start: end.line + 1, swap: false, step: diff });
             }
           } else {
             // CASE: Multiple lines affected
@@ -467,7 +473,7 @@ export function activate(context: vscode.ExtensionContext) {
           }
         }
       } else if (range.isSingleLine) {
-        if (annotatedLineIsChanged(activeDocument, endLine)) {
+        if (annotatedLineIsChanged(activeDocument, end.line)) {
           // same line edit that changed the original characters (delete annotation on that line)
           delete annotations[editLineNo];
         }
