@@ -10,28 +10,35 @@ import {
   Disposable,
   MessageItem,
   workspace,
-  Uri
+  Uri,
+  TextLine,
+  TextDocumentChangeEvent,
+  Range,
+  Position
 } from "vscode";
 
 const { spawn, spawnSync } = require("child_process");
 
-const cornflower = "#6495ed";
-const stopRed = "#ea2f36";
-
-function indexOfEnd(string, target) {
-  var io = string.indexOf(target);
-  return io == -1 ? -1 : io + target.length;
-}
-
-let activeSessions = {};
-
 export function activate(context: vscode.ExtensionContext) {
-  
-  const redIcon = context.asAbsolutePath("media\\wolf-red.png").replace(/\\/g, "/");;
-  const greenIcon =  context.asAbsolutePath("media\\wolf-green.png").replace(/\\/g, "/");;
+  const cornflower = "#6495ed";
+  const stopRed = "#ea2f36";
 
-  console.error(redIcon);
-  console.error(greenIcon);
+  const redIcon = context
+    .asAbsolutePath("media\\wolf-red.png")
+    .replace(/\\/g, "/");
+
+  const greenIcon = context
+    .asAbsolutePath("media\\wolf-green.png")
+    .replace(/\\/g, "/");
+
+  interface WolfSessions {
+    [id: string]: TextEditor;
+  }
+
+  let activeSessions: WolfSessions = {};
+  let activeEditorCountLine: number = 0;
+
+  let annotations = {};
 
   const annotationDecoration: TextEditorDecorationType = vscode.window.createTextEditorDecorationType(
     {
@@ -58,21 +65,20 @@ export function activate(context: vscode.ExtensionContext) {
   function getActiveTextEditor() {
     return vscode.window.activeTextEditor;
   }
-  
+
   function getActiveFileName() {
     return getActiveTextEditor().document.fileName;
   }
-  
+
   function setEnterWolfContext() {
-    vscode.commands.executeCommand('setContext', 'inWolfContext', true);
+    vscode.commands.executeCommand("setContext", "inWolfContext", true);
   }
 
   function setExitWolfContext() {
-    vscode.commands.executeCommand('setContext', 'inWolfContext', false);
-    
+    vscode.commands.executeCommand("setContext", "inWolfContext", false);
   }
 
-  const extPath = vscode.extensions.getExtension("traBpUkciP.wolf")
+  const extPath: string = vscode.extensions.getExtension("traBpUkciP.wolf")
     .extensionPath;
 
   const wolfStartCommand: Disposable = vscode.commands.registerCommand(
@@ -81,11 +87,12 @@ export function activate(context: vscode.ExtensionContext) {
       const activeEditor: TextEditor = getActiveTextEditor();
       const current: string = getActiveFileName();
       activeSessions[path.basename(current)] = activeEditor;
+      activeEditorCountLine = activeEditor.document.lineCount;
       setEnterWolfContext();
       triggerUpdateDecorations();
     }
   );
-  
+
   const wolfStopCommand: Disposable = vscode.commands.registerCommand(
     "wolf.stopBarking",
     () => {
@@ -94,16 +101,26 @@ export function activate(context: vscode.ExtensionContext) {
     }
   );
 
-  context.subscriptions.push(wolfStartCommand);
-  context.subscriptions.push(wolfStopCommand);
+  function pushSubscribers() {
+    context.subscriptions.push(wolfStartCommand);
+    context.subscriptions.push(wolfStopCommand);
+  }
+
+  pushSubscribers();
+
+  function isActiveSession(document: TextDocument) {
+    const activeEditor: TextEditor = getActiveTextEditor();
+    return activeEditor && activeSessions[path.basename(document.fileName)]
+      ? true
+      : false;
+  }
 
   vscode.window.onDidChangeActiveTextEditor(
     event => {
       const activeEditor: TextEditor = getActiveTextEditor();
-      if (
-        activeEditor &&
-        activeSessions[path.basename(event.document.fileName)]
-      ) {
+      activeEditorCountLine = activeEditor.document.lineCount;
+
+      if (isActiveSession(event.document)) {
         triggerUpdateDecorations();
         setEnterWolfContext();
       } else {
@@ -117,6 +134,7 @@ export function activate(context: vscode.ExtensionContext) {
   vscode.workspace.onDidSaveTextDocument(
     event => {
       const activeEditor: TextEditor = getActiveTextEditor();
+      activeEditorCountLine = activeEditor.document.lineCount;
       if (activeEditor && activeSessions[path.basename(event.fileName)]) {
         triggerUpdateDecorations();
       }
@@ -125,35 +143,78 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions
   );
 
-  let timeout = null;
+  vscode.workspace.onDidChangeTextDocument(
+    event => {
+      const activeEditor: TextEditor = getActiveTextEditor();
+
+      if (activeEditor && event.document === activeEditor.document) {
+        if (activeEditor.document.isDirty) {
+          triggerUpdateStickyDecorations(event);
+        }
+      }
+    },
+    null,
+    context.subscriptions
+  );
+
+  let updateTimeout = null;
   function triggerUpdateDecorations() {
-    if (timeout) {
-      clearTimeout(timeout);
+    if (updateTimeout) {
+      clearTimeout(updateTimeout);
     }
-    timeout = setTimeout(updateDecorations, 500);
+    updateTimeout = setTimeout(updateDecorations, 500);
+  }
+
+  let stickyTimeout = null;
+  function triggerUpdateStickyDecorations(event: TextDocumentChangeEvent) {
+    if (stickyTimeout) {
+      clearTimeout(stickyTimeout);
+    }
+    stickyTimeout = setTimeout(() => updateStickyDecorations(event), 100);
+  }
+
+  const debouncedUpdateDecorations = debounce(updateDecorations, 250);
+
+  function debounce(func, wait, immediate?) {
+    /*
+      var myEfficientFn = debounce(function() {
+        // All the taxing stuff you do
+      }, 250);
+    */
+    let timeout;
+    return function(...args) {
+      let context = this;
+      const later = function() {
+        timeout = null;
+        if (!immediate) func.apply(context, args);
+      };
+      let callNow = immediate && !timeout;
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+      if (callNow) func.apply(context, args);
+    };
   }
 
   function _clearSessions() {
     activeSessions = {};
   }
-  
+
   function registerNewSession(editor: TextEditor) {
     const activeEditor: TextEditor = getActiveTextEditor();
     const current: string = getActiveFileName();
     activeSessions[path.basename(current)] = activeEditor;
   }
-  
+
   function removeSessionByName(name) {
     delete activeSessions[name];
   }
-  
+
   function stopSessionByName(name) {
     activeSessions[name].setDecorations(annotationDecoration, []);
     activeSessions[name].setDecorations(annotationDecorationError, []);
   }
-  
+
   function clearEditorSessionDecorations(activeEditor: TextEditor) {
-    const editorFileName: string = getActiveFileName();
     activeEditor.setDecorations(annotationDecoration, []);
     activeEditor.setDecorations(annotationDecorationError, []);
   }
@@ -166,25 +227,71 @@ export function activate(context: vscode.ExtensionContext) {
     _clearSessions();
   }
 
+  function clearAnnotations() {
+    annotations = {};
+  }
+
+  function createDecorations() {
+    const activeEditor: TextEditor = getActiveTextEditor();
+
+    const decorations: vscode.DecorationOptions[] = [];
+    const errorDecorations: vscode.DecorationOptions[] = [];
+
+    Object.keys(annotations).forEach(key => {
+      const lineNo = parseInt(key, 10);
+      const annotation = annotations[lineNo];
+
+      if (!annotation.data) {
+        return;
+      }
+
+      if (activeEditor.document.lineCount < lineNo) {
+        return;
+      }
+
+      if (annotation._loop === true) {
+        annotation.data.pop();
+      }
+
+      const textLine: TextLine = activeEditor.document.lineAt(lineNo - 1);
+      const decoration = {
+        range: textLine.range,
+        renderOptions: {
+          after: {
+            contentText: annotation.data.join(" => "),
+            fontWeight: "normal",
+            fontStyle: "normal",
+            color: annotation._error ? stopRed : cornflower
+          }
+        } as DecorationRenderOptions
+      } as DecorationOptions;
+
+      if (annotation._error) {
+        errorDecorations.push(decoration);
+      } else {
+        decorations.push(decoration);
+      }
+    });
+
+    clearEditorSessionDecorations(activeEditor);
+    activeEditor.setDecorations(annotationDecoration, decorations);
+    activeEditor.setDecorations(annotationDecorationError, errorDecorations);
+  }
+
   function updateDecorations() {
     const activeEditor: TextEditor = getActiveTextEditor();
-    
+
     if (!activeEditor) {
       return;
     }
-
-    clearEditorSessionDecorations(activeEditor);
 
     const scriptName: string = getActiveFileName();
     const scriptDir: string = path.dirname(scriptName);
 
     const wolfPath: string = path.join(extPath, "scripts/wolf.py");
-
-    // const python = spawn("python", [wolfPath, scriptName], { cwd: scriptDir });
     const python = spawn("python", [wolfPath, scriptName]);
 
     python.stderr.on("data", data => {
-      // TODO: Check for other error TAGS (see: `scripts/wolf.py` in main function)
       if (data.includes("IMPORT_ERROR")) {
         // This means the 'hunter' package is not installed .. Notify
         // and offer to install for user automatically.
@@ -198,7 +305,7 @@ export function activate(context: vscode.ExtensionContext) {
             if (result === installHunter) {
               const child = spawn("pip", ["install", "hunter", "--user"]);
               child.stderr.on("data", data => {
-                console.error("INSTALL_ERROR:", data + "")
+                console.error("INSTALL_ERROR:", data + "");
               });
               child.on("close", code => {
                 if (code !== 0) {
@@ -217,46 +324,40 @@ export function activate(context: vscode.ExtensionContext) {
               });
             }
           });
-        }
-        console.error('STDERR:', data + '')
-      });
+      }
+      console.error("STDERR:", data + "");
+    });
+
+    function indexOfEnd(string, target) {
+      let io = string.indexOf(target);
+      return io === -1 ? -1 : io + target.length;
+    }
 
     python.stdout.on("data", data => {
-      // The script didn't return an error code, let's
-      // parse the data..
       const w_index = indexOfEnd(data + "", "WOOF:");
+
       if (w_index === -1) {
-        // Nothing, maybe a new file..
         return;
       }
-      
-      // ---------
-      
+
       let lines;
       try {
         lines = JSON.parse(data.slice(w_index));
       } catch (err) {
-        console.error("ERROR_DATA:", data);
-        console.error("W_INDEX:", w_index);
-        console.error("JSON PARSE ERROR.");
+        console.error("Error parsing Wolf output. ->");
+        console.error(err);
         return;
       }
-      
-      // TODO: Create a Wolf "OUTPUT" window
-      // console.log(JSON.stringify(lines, null, 4));
 
-      const decorations: vscode.DecorationOptions[] = [];
-      const errorDecorations: vscode.DecorationOptions[] = [];
-      const annotations = {};
+      clearAnnotations();
 
-      // This is where we determine how each type will be
-      // represented in the decoration.
       lines.forEach(element => {
+        const hasValue = element.hasOwnProperty("value");
+
         let value;
-        const hasValue = element.hasOwnProperty('value');
-        if (hasValue && element.kind === "line" || element.error) {
+        if ((hasValue && element.kind === "line") || element.error) {
           if (Array.isArray(element.value)) {
-            value = "[" + element.value.join(', ') + "]";
+            value = "[" + element.value.join(", ") + "]";
           } else if (typeof element.value === "string") {
             value = element.value;
           } else if (typeof element.value === "number") {
@@ -266,54 +367,136 @@ export function activate(context: vscode.ExtensionContext) {
           } else {
             value = `${element.value}`;
           }
-          const currentLine = element.line_number - 1;
-          
-          const meta = annotations[currentLine] || {};
-          const hasSeen = meta.data;
-          const payload = {
-            _loop: false,
-            _error: element.error ? true : false,
-            data: null
-          }
 
-          if (hasSeen) {
-            payload.data = [...hasSeen, value];
-          } else {
-            payload.data = [value];
-          }
-          
-          if (element.hasOwnProperty('_loop')) {
-            payload._loop = true;
-          }
+          const currentLine: number = element.line_number;
+          const meta = annotations[currentLine] || {};
+          const payload = {
+            data: [...(meta.data || []), value],
+            _error: element.error ? true : false,
+            _loop: element.hasOwnProperty("_loop"),
+            _source: element.source
+          };
+
           annotations[currentLine] = payload;
         }
       });
-      Object.keys(annotations).forEach(key => {
-        const annotation = annotations[key];
-        if (annotation._loop === true) {
-          annotation.data.pop();
-        }
-        const line = activeEditor.document.lineAt(parseInt(key, 10));
-        const decoration = {
-          range: line.range,
-          renderOptions: {
-            after: {
-              contentText: annotation.data.join(' => '),
-              fontWeight: "normal",
-              fontStyle: "normal",
-              color: annotation._error ? stopRed : cornflower,
-            }
-          } as DecorationRenderOptions
-        } as DecorationOptions;
-        if (annotation._error) {
-          errorDecorations.push(decoration);
-        } else {
-          decorations.push(decoration);
-        }
-      });
 
-      activeEditor.setDecorations(annotationDecoration, decorations);
-      activeEditor.setDecorations(annotationDecorationError, errorDecorations);
+      createDecorations();
     });
+  }
+
+  // function used to attach bookmarks at the line
+  function updateStickyDecorations(event: TextDocumentChangeEvent) {
+    const activeEditor: TextEditor = getActiveTextEditor();
+
+    if (event.contentChanges.length === 1) {
+      const startIndex: number = event.contentChanges[0].range.start.character;
+      const endLine: number = event.contentChanges[0].range.end.line;
+
+      const activeDocument: TextDocument = activeEditor.document;
+      const editLineNo: number = endLine + 1;
+
+      const source: string = { ...annotations[editLineNo] }._source || "";
+
+      if (event.document.lineCount != activeEditorCountLine) {
+        if (event.document.lineCount > activeEditorCountLine) {
+          // Added lines
+          if (startIndex >= activeDocument.lineAt(editLineNo).text.length) {
+            shiftDown({
+              start: editLineNo + 1,
+              end: activeEditorCountLine - 1,
+              swap: false
+            });
+          } else if (startIndex === 0) {
+            shiftDown({
+              start: editLineNo,
+              end: activeEditorCountLine - 1,
+              swap: false
+            });
+          } else {
+            // Same as first if, but delete first annotation at end
+            shiftDown({
+              start: editLineNo + 1,
+              end: activeEditorCountLine - 1,
+              swap: false
+            });
+            delete annotations[editLineNo];
+          }
+        } else if (event.document.lineCount < activeEditorCountLine) {
+          // Lines were removed
+          const startLine = event.contentChanges[0].range.start.line;
+          const endLine = event.contentChanges[0].range.end.line;
+          const diff = endLine - startLine;
+          if (diff !== 0 || event.contentChanges[0].text.length !== 0) {
+            if (event.contentChanges[0].range.start.character === 0) {
+              removeDecorationLines(startLine, endLine);
+            } else {
+              removeDecorationLines(startLine + 1, endLine);
+            }
+          }
+        }
+      } else if (source.trim() !== activeDocument.lineAt(endLine).text.trim()) {
+        delete annotations[editLineNo];
+      }
+      createDecorations();
+    } else if (event.contentChanges.length === 2) {
+      if (activeEditor.selections.length === 1) {
+        const start: number = event.contentChanges[1].range.end.line;
+        const end: number = event.contentChanges[0].range.end.line;
+        if (event.contentChanges[0].text === "") {
+          shiftDown({ start: start + 1, end: end + 1 });
+        } else if (event.contentChanges[1].text === "") {
+          shiftUp({ start, end: end + 1 });
+        }
+        createDecorations();
+      }
+    }
+    activeEditorCountLine = event.document.lineCount;
+  }
+
+  function removeDecorationLines(start: number, end: number) {
+    for (let index = start + 1; index <= end + 1; index++) {
+      delete annotations[index];
+    }
+    shiftUp({ start: start + 1, swap: false, step: end - start });
+  }
+
+  function shiftDown({ start, end = -1, swap = true, step = 1 }) {
+    const nextAnnotations = {};
+    Object.keys(annotations).forEach(key => {
+      const intKey = parseInt(key, 10);
+      let nextKey;
+      if (end !== -1) {
+        nextKey = start <= intKey && intKey <= end ? intKey + step : intKey;
+      } else {
+        nextKey = start <= intKey ? intKey + step : intKey;
+      }
+      nextAnnotations[nextKey] = { ...annotations[key] };
+    });
+    if (swap) {
+      nextAnnotations[start] = { ...annotations[end] };
+      nextAnnotations[end + 1] = { ...annotations[end + 1] };
+    }
+
+    annotations = { ...nextAnnotations };
+  }
+
+  function shiftUp({ start, end = -1, swap = true, step = 1 }) {
+    const nextAnnotations = {};
+    Object.keys(annotations).forEach(key => {
+      const intKey = parseInt(key, 10);
+      let nextKey;
+      if (end !== -1) {
+        nextKey = start <= intKey && intKey <= end ? intKey - step : intKey;
+      } else {
+        nextKey = start <= intKey ? intKey - step : intKey;
+      }
+      nextAnnotations[nextKey] = { ...annotations[key] };
+    });
+    if (swap) {
+      nextAnnotations[end] = { ...annotations[start] };
+      nextAnnotations[start - 1] = { ...annotations[start - 1] };
+    }
+    annotations = { ...nextAnnotations };
   }
 }
