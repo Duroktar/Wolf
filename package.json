@@ -2,20 +2,36 @@
   "name": "wolf",
   "displayName": "Wolf",
   "description": "Python live scratchpad",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "publisher": "traBpUkciP",
   "license": "Apache-2.0",
   "engines": {
     "vscode": "^1.12.0"
   },
   "categories": ["Debuggers", "Other"],
-  "activationEvents": ["onCommand:wolf.barkAtCurrentFile"],
+  "activationEvents": [
+    "onCommand:wolf.barkAtCurrentFile",
+    "onCommand:wolf.touchBarStart"
+  ],
   "main": "./out/src/extension",
   "contributes": {
+    "configuration": {
+      "type": "object",
+      "title": "Wolf configuration",
+      "properties": {
+        "wolf.pawPrintsInGutter": {
+          "type": "boolean",
+          "default": false,
+          "description":
+            "Use Paw Print style icons in the gutters. (Requires restart)"
+        }
+      }
+    },
     "commands": [
       {
         "command": "wolf.barkAtCurrentFile",
-        "title": "Wolf: Set the Wolf on the current file.",
+        "category": "wolf",
+        "title": "Set the Wolf on the current file.",
         "icon": {
           "light": "./media/wolf-dark-blue.png",
           "dark": "./media/wolf-dark-blue.png"
@@ -23,14 +39,41 @@
       },
       {
         "command": "wolf.stopBarking",
-        "title": "Wolf: Stops all running Wolf sessions.",
+        "category": "wolf",
+        "title": "Stops all running Wolf sessions.",
         "icon": {
           "light": "./media/wolf-red.png",
           "dark": "./media/wolf-red.png"
         }
+      },
+      {
+        "command": "wolf.touchBarStart",
+        "title": "Set the Wolf on the current file.",
+        "icon": {
+          "light": "./media/wolf-dark-blue-border.png",
+          "dark": "./media/wolf-dark-blue-border.png"
+        }
+      },
+      {
+        "command": "wolf.touchBarStop",
+        "title": "Stops all running Wolf sessions.",
+        "icon": {
+          "light": "./media/wolf-red-border.png",
+          "dark": "./media/wolf-red-border.png"
+        }
       }
     ],
     "menus": {
+      "touchBar": [
+        {
+          "command": "wolf.touchBarStop",
+          "when": "inWolfContext"
+        },
+        {
+          "command": "wolf.touchBarStart",
+          "when": "editorLangId == python && !inWolfContext"
+        }
+      ],
       "editor/title": [
         {
           "command": "wolf.stopBarking",

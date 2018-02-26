@@ -154,6 +154,17 @@ You can't get any better than _live feedback next to the code you're editing_!
 
 ## **Changelog**
 
+## v0.1.7
+
+### Macbook Touch-Bar Icons
+
+Toggle Wolf on and off from the touch bar.
+
+### Wolf Paw gutter icons
+
+Set `wolf.pawGutterIcons`: `true` to swap the default gutter
+icons with the new paw print style. (Requires restart)
+
 ## v0.1.6.patch ~ Minor updates to sticky handling
 
 ## v0.1.5
