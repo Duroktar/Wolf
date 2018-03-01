@@ -1,36 +1,12 @@
 import * as path from "path";
-import { Position, TextDocument, TextEditor } from "vscode";
 import * as vscode from "vscode";
-
 import {
   WolfDecorationMapping,
   WolfTraceLineResult,
   WolfActiveSessionCollection,
   WolfValue
 } from "./types";
-
-export function getActiveEditor() {
-  return vscode.window.activeTextEditor;
-}
-
-export function getActiveFileName() {
-  return getActiveEditor().document.fileName;
-}
-
-export function isActiveSession(
-  document: TextDocument,
-  sessions: WolfActiveSessionCollection
-) {
-  const activeEditor: TextEditor = getActiveEditor();
-  return activeEditor && sessions[path.basename(document.fileName)]
-    ? true
-    : false;
-}
-
-export function indexOrLast(string: string, target: string) {
-  let io: number = string.indexOf(target);
-  return io === -1 ? -1 : io + target.length;
-}
+import { Position, TextDocument, TextEditor } from "vscode";
 
 export function annotatedLineIsChanged(
   document: TextDocument,
@@ -40,14 +16,6 @@ export function annotatedLineIsChanged(
   const source: string = { ...decorations[line + 1] }.source || "";
   const documentTextLine = document.lineAt(line).text.trim();
   return documentTextLine !== "" && source.trim() !== documentTextLine;
-}
-
-export function isPositionAtEndOfLine(
-  endPos: Position,
-  document: TextDocument
-): boolean {
-  const otherPos: Position = document.lineAt(endPos.line).range.end;
-  return endPos.isEqual(otherPos);
 }
 
 export function formatWolfResponseElement(
@@ -69,4 +37,35 @@ export function formatWolfResponseElement(
         return `${element.value}`;
     }
   }
+}
+
+export function getActiveEditor(): TextEditor {
+  return vscode.window.activeTextEditor;
+}
+
+export function getActiveFileName(): string {
+  return getActiveEditor().document.fileName;
+}
+
+export function indexOrLast(string: string, target: string) {
+  let io: number = string.indexOf(target);
+  return io === -1 ? -1 : io + target.length;
+}
+
+export function isActiveSession(
+  document: TextDocument,
+  sessions: WolfActiveSessionCollection
+) {
+  const activeEditor: TextEditor = getActiveEditor();
+  return activeEditor && sessions[path.basename(document.fileName)]
+    ? true
+    : false;
+}
+
+export function isPositionAtEndOfLine(
+  endPos: Position,
+  document: TextDocument
+): boolean {
+  const otherPos: Position = document.lineAt(endPos.line).range.end;
+  return endPos.isEqual(otherPos);
 }

@@ -3,13 +3,21 @@ import { TextEditor, TextDocument, WorkspaceConfiguration } from "vscode";
 import { WolfActiveSessionCollection } from "./types";
 import { getActiveEditor } from "./utils";
 
+export function wolfSessionStoreFactory(config: WorkspaceConfiguration) {
+  return new WolfSessionController(config);
+}
+
 export class WolfSessionController {
   private _sessions: WolfActiveSessionCollection = {};
 
   constructor(config: WorkspaceConfiguration) {}
 
-  public get collection(): WolfActiveSessionCollection {
-    return this._sessions;
+  public clearAllSessions(): void {
+    this._sessions = {} as WolfActiveSessionCollection;
+  }
+
+  public clearSessionByName(name): void {
+    delete this._sessions[name];
   }
 
   public createSessionFromEditor(editor: TextEditor): void {
@@ -21,35 +29,27 @@ export class WolfSessionController {
     return this._sessions[path.basename(activeEditor.document.fileName)];
   }
 
-  public getSessionByName(name: string): TextEditor {
-    return this._sessions[name];
+  public getAllSessions(): WolfActiveSessionCollection {
+    return this._sessions;
   }
 
-  public sessionIsActiveByFileName(fileName: string): boolean {
-    return this._sessions[path.basename(fileName)] ? true : false;
+  public getSessionByName(name: string): TextEditor {
+    return this._sessions[name];
   }
 
   public sessionIsActiveByDocument(document: TextDocument): boolean {
     return this._sessions[path.basename(document.fileName)] ? true : false;
   }
 
-  public getAllSessions(): WolfActiveSessionCollection {
+  public sessionIsActiveByFileName(fileName: string): boolean {
+    return this._sessions[path.basename(fileName)] ? true : false;
+  }
+
+  public get collection(): WolfActiveSessionCollection {
     return this._sessions;
-  }
-
-  public clearSessionByName(name): void {
-    delete this._sessions[name];
-  }
-
-  public clearAllSessions(): void {
-    this._sessions = {} as WolfActiveSessionCollection;
   }
 
   public get sessionNames(): string[] {
     return Object.keys(this._sessions);
   }
-}
-
-export function wolfSessionStoreFactory(config: WorkspaceConfiguration) {
-  return new WolfSessionController(config);
 }
