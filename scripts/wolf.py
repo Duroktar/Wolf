@@ -148,6 +148,15 @@ def script_path(script_dir):
     sys.path.remove(script_dir)
 
 
+def get_line_from_file(_file, lineno):
+    with open(_file) as fs:
+        lines = fs.readlines()
+    if lineno <= len(lines):
+        return lines[lineno - 1]
+    else:
+        return ""
+
+
 ###################
 #
 # Wolf Internal API
@@ -206,7 +215,7 @@ def resultifier(value):
     elif isinstance(value, int):
         return value
     else:
-        return pformat(value)
+        return str(value)
 
 
 def wolf_prints():
@@ -229,10 +238,12 @@ def try_eval(*args, **kw):
     except Exception as e:
         if event['kind'] == 'line':
             metadata = {
-                "line_number": event['lineno'],
-                "kind":          event['kind'],
-                "value":               repr(e),
-                "error":                   True
+                "line_number":         event['lineno'],
+                "source":      event['source'].strip(),
+                "kind":                  event['kind'],
+                "value":                       repr(e),
+                "pretty":                      repr(e),
+                "error":                          True,
             }
 
             WOLF.append(metadata)
@@ -269,7 +280,8 @@ def result_handler(event):
         "kind":                 event['kind'],
         "depth":               event['depth'],
         "source":     event['source'].strip(),
-        # "value"      <-  Defined below MAYBE..
+        # "value"    <-  Defined below MAYBE..
+        # "pretty"                  <-  SAME..
     }
 
     # The annotation will take on this value
@@ -303,6 +315,9 @@ def result_handler(event):
             value = try_eval(match['print'], _globals, _locals, event=event)
 
         metadata['value'] = resultifier(value)
+
+        # And a nicely formatted version as well.
+        metadata['pretty'] = pformat(value, indent=4, width=60)
 
     WOLF.append(metadata)
 
@@ -391,16 +406,16 @@ def main(filename):
         return 1
 
     # The full path to the script (including filename and extension)
-    module_path = os.path.abspath(filename)
+    full_path = os.path.abspath(filename)
 
     # The `import`able name of the target file
     # ie: /home/duroktar/scripts/my_script.py  ->  my_script
-    module_name = os.path.basename(module_path).split('.')[0]
+    module_name = os.path.basename(full_path).split('.')[0]
 
     # Okay, so let's go ahead and fire this thing up.
     try:
 
-        import_and_trace_script(module_name, module_path)
+        import_and_trace_script(module_name, full_path)
 
     except Exception as e:
 
@@ -412,21 +427,19 @@ def main(filename):
         # repr, so I decided to use that instead.
         _, _, exc_traceback = sys.exc_info()
         tb = traceback.extract_tb(exc_traceback)[-1]
+        source = get_line_from_file(full_path, tb[1])
         metadata = {
             "line_number":      tb[1],
+            "source":  source.strip(),
             "value":          repr(e),
-            "error":              True
+            "pretty":         repr(e),
+            "error":             True,
         }
 
         # And tack the error on to our response.
         WOLF.append(metadata)
 
     if WOLF:
-
-        # Just some pretty lines for visual debugging. We can send
-        # data to `stderr` and `stdout` because the client has a
-        # different handler implemented for each.
-        # print("DEBUG:" + pformat(WOLF, indent=4), file=sys.stderr)
 
         # We must have some data ready for the client, let's print
         # the results and return a 0 for the exit code

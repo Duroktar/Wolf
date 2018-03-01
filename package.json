@@ -22,13 +22,11 @@
         "wolf.pawPrintsInGutter": {
           "type": "boolean",
           "default": false,
-          "description":
-            "Use Paw Print style icons in the gutters. (Requires restart)"
+          "description": "Use Paw Print style icons in the gutters. (Requires restart)"
         }
       }
     },
-    "commands": [
-      {
+    "commands": [{
         "command": "wolf.barkAtCurrentFile",
         "category": "wolf",
         "title": "Set the Wolf on the current file.",
@@ -64,8 +62,7 @@
       }
     ],
     "menus": {
-      "touchBar": [
-        {
+      "touchBar": [{
           "command": "wolf.touchBarStop",
           "when": "inWolfContext"
         },
@@ -74,8 +71,7 @@
           "when": "editorLangId == python && !inWolfContext"
         }
       ],
-      "editor/title": [
-        {
+      "editor/title": [{
           "command": "wolf.stopBarking",
           "when": "inWolfContext",
           "group": "navigation"
@@ -107,12 +103,12 @@
   },
   "devDependencies": {
     "@types/mocha": "^2.2.32",
-    "@types/node": "^6.0.40",
-    "electron": "^1.7.12",
+    "@types/node": "^6.0.101",
+    "electron": "^1.8.2",
     "electron-rebuild": "^1.7.3",
     "mocha": "^2.3.3",
-    "typescript": "^2.0.3",
-    "vsce": "^1.36.3",
-    "vscode": "^1.0.0"
+    "typescript": "^2.7.2",
+    "vsce": "^1.37.1",
+    "vscode": "^1.1.10"
   }
 }
