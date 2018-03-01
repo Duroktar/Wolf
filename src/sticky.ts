@@ -1,9 +1,24 @@
-import { TextDocumentChangeEvent, TextDocument, TextEditor } from "vscode";
+import {
+  TextDocumentChangeEvent,
+  TextDocument,
+  TextEditor,
+  WorkspaceConfiguration
+} from "vscode";
 import { annotatedLineIsChanged, getActiveEditor } from "./utils";
 import { WolfDecorationsController } from "./decorations";
 
+export function wolfStickyControllerFactory(
+  config: WorkspaceConfiguration,
+  decorationController: WolfDecorationsController
+) {
+  return new WolfStickyController(config, decorationController);
+}
+
 export class WolfStickyController {
-  constructor(private decorationController: WolfDecorationsController) {}
+  constructor(
+    private config: WorkspaceConfiguration,
+    private decorationController: WolfDecorationsController
+  ) {}
 
   public updateStickyDecorations = (
     event: TextDocumentChangeEvent,
@@ -120,12 +135,13 @@ export class WolfStickyController {
         }
       }
     } else if (event.contentChanges.length === 2) {
-      // Multi line edit
+      // Multi line or indented edit
       if (activeEditor.selections.length === 1) {
         if (
           event.contentChanges[0].text.startsWith("\n") &&
           event.contentChanges[1].text === ""
         ) {
+          // Newline at end of blank indented line
           const { range: { start, end } } = event.contentChanges[0];
           if (start.character > 0) {
             if (
@@ -154,10 +170,4 @@ export class WolfStickyController {
       }
     }
   };
-}
-
-export function wolfStickyControllerFactory(
-  decorationController: WolfDecorationsController
-) {
-  return new WolfStickyController(decorationController);
 }

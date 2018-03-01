@@ -12,17 +12,16 @@ import {
 import {
   WolfColorSelection,
   WolfDecorationOptions,
-  wolfHexColor,
   WolfDecorationMapping,
   WolfLineDecoration,
   WolfSessionDecorations,
   WolfStandardDecorationTypes,
-  WolfTraceLineResult,
-  WolfHexColorMap
+  WolfTraceLineResult
 } from "./types";
 
 import { getActiveEditor, formatWolfResponseElement } from "./utils";
 import { wolfIconProvider } from "./icons";
+import { wolfTextColorProvider } from "./colors";
 
 export function wolfDecorationStoreFactory(
   context: ExtensionContext,
@@ -117,7 +116,8 @@ export class WolfDecorationsController {
 
   private getLineDecorationOrDefault = (lineNo: number): WolfLineDecoration => {
     return (
-      this.getDecorationAtLine(lineNo) || ({ data: [] } as WolfLineDecoration)
+      this.getDecorationAtLine(lineNo) ||
+      ({ data: [], pretty: [] } as WolfLineDecoration)
     );
   };
 
@@ -141,7 +141,7 @@ export class WolfDecorationsController {
       error: line.error ? true : false,
       loop: line.hasOwnProperty("_loop"),
       source: line.source,
-      pretty: line.pretty
+      pretty: [...existing.pretty, line.pretty]
     } as WolfLineDecoration;
     this.setDecorationAtLine(lineNo, decoration);
   };
@@ -166,7 +166,7 @@ export class WolfDecorationsController {
       const decoration: DecorationOptions = this.createWolfDecorationOptions({
         range: textLine.range,
         text: decorationData.data.join(" => "),
-        hoverText: decorationData.pretty,
+        hoverText: decorationData.pretty.join("\n"),
         color: decorationData.error ? "red" : "cornflower"
       } as WolfDecorationOptions);
       (decorationData.error ? errorDecorations : decorations).push(decoration);
@@ -252,15 +252,4 @@ export class WolfDecorationsController {
   public get pawprints(): boolean {
     return this.config.get("pawPrintsInGutter") ? true : false;
   }
-}
-
-const WolfColorMap = {
-  cornflower: "#6495ed",
-  blue: "#00a1f1",
-  green: "#7cbb00",
-  red: "#ea2f36"
-} as WolfHexColorMap;
-
-function wolfTextColorProvider(color: WolfColorSelection) {
-  return WolfColorMap[color] as wolfHexColor;
 }

@@ -32,14 +32,14 @@ export function activate(context: ExtensionContext) {
     startWolf
   );
 
-  const wolfStopCommand: Disposable = vscode.commands.registerCommand(
-    "wolf.stopBarking",
-    stopWolf
-  );
-
   const wolfStartAction: Disposable = vscode.commands.registerCommand(
     "wolf.touchBarStart",
     startWolf
+  );
+
+  const wolfStopCommand: Disposable = vscode.commands.registerCommand(
+    "wolf.stopBarking",
+    stopWolf
   );
 
   const wolfStopAction: Disposable = vscode.commands.registerCommand(
@@ -60,30 +60,17 @@ export function activate(context: ExtensionContext) {
     context.subscriptions
   );
 
-  vscode.workspace.onDidSaveTextDocument(
-    handleDidSaveTextDocument,
-    null,
-    context.subscriptions
-  );
-
   vscode.workspace.onDidChangeTextDocument(
     handleDidChangeTextDocument,
     null,
     context.subscriptions
   );
 
-  function handleDidSaveTextDocument(document: TextDocument) {
-    if (wolfAPI.isDocumentWolfSession(document)) {
-      wolfAPI.updateLineCount(document.lineCount);
-      throttledRefreshDecorations();
-    }
-  }
-
-  function handleDidChangeTextDocument(event: TextDocumentChangeEvent) {
-    if (wolfAPI.isDocumentWolfSession(event.document)) {
-      throttledUpdateStickys(event);
-    }
-  }
+  vscode.workspace.onDidSaveTextDocument(
+    handleDidSaveTextDocument,
+    null,
+    context.subscriptions
+  );
 
   function handleDidChangeActiveTextEditor(
     editor: ActiveTextEditorChangeEventResult
@@ -99,8 +86,27 @@ export function activate(context: ExtensionContext) {
     }
   }
 
+  function handleDidChangeTextDocument(event: TextDocumentChangeEvent) {
+    if (wolfAPI.isDocumentWolfSession(event.document)) {
+      throttledUpdateStickys(event);
+    }
+  }
+
+  function handleDidSaveTextDocument(document: TextDocument) {
+    if (wolfAPI.isDocumentWolfSession(document)) {
+      wolfAPI.updateLineCount(document.lineCount);
+      throttledRefreshDecorations();
+    }
+  }
+
   let updateTimeout = null;
   let stickyTimeout = null;
+
+  function cancelPending() {
+    [updateTimeout, stickyTimeout].forEach(pending => {
+      if (pending) clearTimeout(pending);
+    });
+  }
 
   function throttledRefreshDecorations(trace: boolean = true) {
     if (updateTimeout) {
@@ -117,11 +123,5 @@ export function activate(context: ExtensionContext) {
       clearTimeout(stickyTimeout);
     }
     stickyTimeout = setTimeout(() => wolfAPI.updateStickys(event), 100);
-  }
-
-  function cancelPending() {
-    [updateTimeout, stickyTimeout].forEach(pending => {
-      if (pending) clearTimeout(pending);
-    });
   }
 }

@@ -6,6 +6,10 @@ import { installHunter } from "./hunterInstaller";
 
 const { spawn } = require("child_process");
 
+export function pythonTracerFactory(config: WorkspaceConfiguration) {
+  return new PythonTracer(config);
+}
+
 export class PythonTracer {
   constructor(config: WorkspaceConfiguration) {}
 
@@ -54,8 +58,4 @@ export class PythonTracer {
       return null;
     }
   }
-}
-
-export function pythonTracerFactory(config: WorkspaceConfiguration) {
-  return new PythonTracer(config);
 }

@@ -6,12 +6,12 @@ import {
 } from "vscode";
 
 export type WolfIcon = string;
-export type wolfHexColor = string;
+export type WolfHexColor = string;
 export type WolfColorSelection = "red" | "cornflower" | "blue" | "green";
-export type WolfIconColor = "red" | "blue";
+export type WolfIconColor = "red" | "green" | "blue";
 
-export type WolfHexColorMap = { [P in WolfColorSelection]: wolfHexColor };
-export type WolfIconColorMap = { [P in WolfColorSelection]: WolfIconColor };
+export type WolfHexColorType = { [P in WolfColorSelection]: WolfHexColor };
+export type WolfIconColorType = { [P in WolfColorSelection]: WolfIconColor };
 
 export interface WolfActiveSessionCollection {
   [id: string]: TextEditor;
@@ -32,7 +32,7 @@ export interface WolfLineDecoration {
   error: boolean;
   loop: boolean;
   source: string;
-  pretty: string;
+  pretty: string[];
 }
 
 export interface WolfDecorationMapping {
