@@ -1,4 +1,4 @@
-# Wolf - It kicks the Quokkas ass
+# Wolf - It kicks the Quokkas ass  [![Build Status](https://travis-ci.org/Almenon/Wolf.svg?branch=v0.2.0pre)](https://travis-ci.org/Almenon/Wolf)
 
 Wolf is a VsCode extension that enables live inspection of Python code in the editor.
 
