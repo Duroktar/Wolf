@@ -306,13 +306,15 @@ def result_handler(event):
 
         # The simplest case is a variable, which we'll just
         # evaluate it directly.
-        if match['variable']:
-            value = try_eval(match['variable'], _globals, _locals, event=event)
+        if match.group('variable'):
+            value = try_eval(match.group('variable'),
+                             _globals, _locals, event=event)
 
         # In the case of "print", we evaluate and return the same
         # expression passed in.
-        if match['print']:
-            value = try_eval(match['print'], _globals, _locals, event=event)
+        if match.group('print'):
+            value = try_eval(match.group('print'),
+                             _globals, _locals, event=event)
 
         metadata['value'] = resultifier(value)
 
