@@ -298,7 +298,6 @@ def result_handler(event):
     # This regex does all the heavy lifting. Check out
     # https://regex101.com/r/npWf6w/5 for an example of
     # # how it works.
-    print(source, file=sys.stderr)
     match = WOLF_MACROS.search(source)
 
     # Regex match groups are used for convenience.
@@ -427,12 +426,19 @@ def main(filename):
         # repr, so I decided to use that instead.
         _, _, exc_traceback = sys.exc_info()
         tb = traceback.extract_tb(exc_traceback)[-1]
-        source = get_line_from_file(full_path, tb[1])
+        if isinstance(e, SyntaxError):
+            lineno = getattr(e, 'lineno')
+            value = getattr(e, 'msg')
+            source = get_line_from_file(full_path, tb[1])
+        else:
+            lineno = tb[1]
+            value = str(e)
+            source = ""
         metadata = {
-            "line_number":      tb[1],
+            "line_number":     lineno,
             "source":  source.strip(),
-            "value":          repr(e),
-            "pretty":         repr(e),
+            "value":            value,
+            "pretty":           value,
             "error":             True,
         }
 

@@ -11,7 +11,9 @@ export function pythonTracerFactory(config: WorkspaceConfiguration) {
 }
 
 export class PythonTracer {
-  constructor(config: WorkspaceConfiguration) {}
+  constructor(private config: WorkspaceConfiguration) {
+    this.config;
+  }
 
   private getPythonRunner(rootDir) {
     const scriptName: string = getActiveFileName();
@@ -33,7 +35,7 @@ export class PythonTracer {
       if (data.includes("IMPORT_ERROR")) {
         installHunter(afterInstall);
       } else {
-        onError(new String(data));
+        onError(data + "");
       }
     });
 

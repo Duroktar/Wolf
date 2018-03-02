@@ -18,7 +18,9 @@ export class WolfStickyController {
   constructor(
     private config: WorkspaceConfiguration,
     private decorationController: WolfDecorationsController
-  ) {}
+  ) {
+    this.config;
+  }
 
   public updateStickyDecorations = (
     event: TextDocumentChangeEvent,
@@ -27,14 +29,11 @@ export class WolfStickyController {
     const activeEditor: TextEditor = getActiveEditor();
     const activeDocument: TextDocument = activeEditor.document;
     const diff = event.document.lineCount - oldLineCount;
-
     const decorations = this.decorationController.getAllDecorations();
-
     if (event.contentChanges.length === 1) {
       const { range, range: { start, end }, text } = event.contentChanges[0];
       // const actualStartLineNo: number = start.line + 1;
       const actualEndLineNo: number = end.line + 1;
-
       if (event.document.lineCount != oldLineCount) {
         if (event.document.lineCount > oldLineCount) {
           // Added lines
@@ -55,7 +54,6 @@ export class WolfStickyController {
                 this.decorationController.deleteDecorationAtLine(end.line + 1);
               }
             }
-
             const bias = start.character === 0 && end.character === 0 ? 1 : 2;
             this.decorationController.shiftDecorationsDown({
               start: end.line + bias,
@@ -131,7 +129,7 @@ export class WolfStickyController {
       } else if (range.isSingleLine) {
         if (annotatedLineIsChanged(activeDocument, end.line, decorations)) {
           // same line edit that changed the original characters (delete annotation on that line)
-          delete decorations[actualEndLineNo];
+          this.decorationController.deleteDecorationAtLine(actualEndLineNo);
         }
       }
     } else if (event.contentChanges.length === 2) {

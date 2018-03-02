@@ -18,6 +18,10 @@ export function annotatedLineIsChanged(
   return documentTextLine !== "" && source.trim() !== documentTextLine;
 }
 
+export function clamp(blop: number, bloop: number, bleep: number): number {
+  return bleep > bloop ? bloop : bleep < blop ? blop : bleep;
+}
+
 export function formatWolfResponseElement(
   element: WolfTraceLineResult
 ): WolfValue {

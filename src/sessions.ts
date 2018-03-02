@@ -1,4 +1,3 @@
-import * as path from "path";
 import { TextEditor, TextDocument, WorkspaceConfiguration } from "vscode";
 import { WolfActiveSessionCollection } from "./types";
 import { getActiveEditor } from "./utils";
@@ -10,7 +9,9 @@ export function wolfSessionStoreFactory(config: WorkspaceConfiguration) {
 export class WolfSessionController {
   private _sessions: WolfActiveSessionCollection = {};
 
-  constructor(config: WorkspaceConfiguration) {}
+  constructor(private config: WorkspaceConfiguration) {
+    this.config;
+  }
 
   public clearAllSessions(): void {
     this._sessions = {} as WolfActiveSessionCollection;
@@ -21,28 +22,28 @@ export class WolfSessionController {
   }
 
   public createSessionFromEditor(editor: TextEditor): void {
-    this._sessions[path.basename(editor.document.fileName)] = editor;
+    this._sessions[editor.document.fileName] = editor;
   }
 
   public getActiveSession() {
     const activeEditor: TextEditor = getActiveEditor();
-    return this._sessions[path.basename(activeEditor.document.fileName)];
+    return this._sessions[activeEditor.document.fileName];
   }
 
   public getAllSessions(): WolfActiveSessionCollection {
     return this._sessions;
   }
 
-  public getSessionByName(name: string): TextEditor {
-    return this._sessions[name];
+  public getSessionByFileName(fileName: string): TextEditor {
+    return this._sessions[fileName];
   }
 
   public sessionIsActiveByDocument(document: TextDocument): boolean {
-    return this._sessions[path.basename(document.fileName)] ? true : false;
+    return this._sessions[document.fileName] ? true : false;
   }
 
   public sessionIsActiveByFileName(fileName: string): boolean {
-    return this._sessions[path.basename(fileName)] ? true : false;
+    return this._sessions[fileName] ? true : false;
   }
 
   public get collection(): WolfActiveSessionCollection {

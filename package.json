@@ -22,11 +22,25 @@
         "wolf.pawPrintsInGutter": {
           "type": "boolean",
           "default": false,
-          "description": "Use Paw Print style icons in the gutters. (Requires restart)"
+          "description":
+            "Use Paw Print style icons in the gutters. (Requires restart)"
+        },
+        "wolf.hot": {
+          "type": "boolean",
+          "default": false,
+          "description":
+            "Updates the file on throttled text input. Makes Wolf feel more \"live\""
+        },
+        "wolf.hotFrequency": {
+          "type": "number",
+          "default": 320,
+          "description":
+            "Updates the file on throttled text input. Makes Wolf feel more \"live\""
         }
       }
     },
-    "commands": [{
+    "commands": [
+      {
         "command": "wolf.barkAtCurrentFile",
         "category": "wolf",
         "title": "Set the Wolf on the current file.",
@@ -62,7 +76,8 @@
       }
     ],
     "menus": {
-      "touchBar": [{
+      "touchBar": [
+        {
           "command": "wolf.touchBarStop",
           "when": "inWolfContext"
         },
@@ -71,7 +86,8 @@
           "when": "editorLangId == python && !inWolfContext"
         }
       ],
-      "editor/title": [{
+      "editor/title": [
+        {
           "command": "wolf.stopBarking",
           "when": "inWolfContext",
           "group": "navigation"

@@ -7,18 +7,20 @@ import {
   WorkspaceConfiguration,
   workspace
 } from "vscode";
+// import throttle from "lodash/throttle";
 
 import { wolfStandardApiFactory, WolfAPI } from "./api";
 import { ActiveTextEditorChangeEventResult } from "./types";
+import { clamp } from "./utils";
 
 export function activate(context: ExtensionContext) {
   const wolfConfig: WorkspaceConfiguration = workspace.getConfiguration("wolf");
   const wolfAPI: WolfAPI = wolfStandardApiFactory(context, wolfConfig);
 
   function startWolf() {
-    wolfAPI.startWolf();
+    wolfAPI.stepInWolf();
     wolfAPI.enterWolfContext();
-    throttledRefreshDecorations();
+    throttledHandleDidSaveTextDocument();
   }
 
   function stopWolf() {
@@ -74,11 +76,11 @@ export function activate(context: ExtensionContext) {
 
   function handleDidChangeActiveTextEditor(
     editor: ActiveTextEditorChangeEventResult
-  ) {
+  ): void {
     if (editor) {
       wolfAPI.updateLineCount(editor.document.lineCount);
       if (wolfAPI.sessions.sessionIsActiveByDocument(editor.document)) {
-        throttledRefreshDecorations(false);
+        throttledHandleDidSaveTextDocument(false);
         wolfAPI.enterWolfContext();
       } else {
         wolfAPI.exitWolfContext();
@@ -86,42 +88,50 @@ export function activate(context: ExtensionContext) {
     }
   }
 
-  function handleDidChangeTextDocument(event: TextDocumentChangeEvent) {
+  function handleDidChangeTextDocument(event: TextDocumentChangeEvent): void {
     if (wolfAPI.isDocumentWolfSession(event.document)) {
-      throttledUpdateStickys(event);
+      throttledHandleDidChangeTextDocument(event);
+      if (wolfAPI.isHot) {
+        wolfAPI.activeEditor.document.save();
+      }
     }
   }
 
-  function handleDidSaveTextDocument(document: TextDocument) {
+  function handleDidSaveTextDocument(document: TextDocument): void {
     if (wolfAPI.isDocumentWolfSession(document)) {
       wolfAPI.updateLineCount(document.lineCount);
-      throttledRefreshDecorations();
+      throttledHandleDidSaveTextDocument(true);
     }
   }
 
   let updateTimeout = null;
   let stickyTimeout = null;
 
-  function cancelPending() {
+  function cancelPending(): void {
     [updateTimeout, stickyTimeout].forEach(pending => {
       if (pending) clearTimeout(pending);
     });
   }
 
-  function throttledRefreshDecorations(trace: boolean = true) {
+  function throttledHandleDidSaveTextDocument(trace: boolean = true): void {
     if (updateTimeout) {
       clearTimeout(updateTimeout);
     }
     updateTimeout = setTimeout(
-      () => wolfAPI.traceOrRenderPreparedDecorations(trace),
-      500
+      () => wolfAPI.handleDidSaveTextDocument(trace),
+      wolfAPI.isHot ? clamp(100, 10000, wolfAPI.hotFrequency) : 500
     );
   }
 
-  function throttledUpdateStickys(event: TextDocumentChangeEvent) {
+  function throttledHandleDidChangeTextDocument(
+    event: TextDocumentChangeEvent
+  ): void {
     if (stickyTimeout) {
       clearTimeout(stickyTimeout);
     }
-    stickyTimeout = setTimeout(() => wolfAPI.updateStickys(event), 100);
+    stickyTimeout = setTimeout(
+      () => wolfAPI.handleDidChangeTextDocument(event),
+      450
+    );
   }
 }

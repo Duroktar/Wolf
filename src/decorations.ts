@@ -6,7 +6,9 @@ import {
   window,
   TextLine,
   ExtensionContext,
-  WorkspaceConfiguration
+  WorkspaceConfiguration,
+  Range,
+  Position
 } from "vscode";
 import {
   WolfColorSelection,
@@ -37,7 +39,7 @@ export class WolfDecorationsController {
     public config: WorkspaceConfiguration
   ) {}
 
-  private createGutterDecoration = (
+  private createEditorDecorationForGutters = (
     gutterIconColor: WolfColorSelection,
     leftMargin: number = 3
   ): TextEditorDecorationType => {
@@ -46,6 +48,10 @@ export class WolfDecorationsController {
         margin: `0 0 0 ${leftMargin}em`,
         textDecoration: "none"
       },
+      isWholeLine: true,
+      rangeBehavior: 1,
+      overviewRulerLane: 1,
+      overviewRulerColor: wolfTextColorProvider(gutterIconColor),
       gutterIconPath: wolfIconProvider(
         this.context,
         gutterIconColor,
@@ -135,45 +141,13 @@ export class WolfDecorationsController {
     );
     const decoration = {
       data: [...existing.data, annotation],
-      lineno: line.line_number,
+      lineno: lineNo,
       error: line.error ? true : false,
       loop: line.hasOwnProperty("_loop"),
       source: line.source,
       pretty: [...existing.pretty, line.pretty]
     } as WolfLineDecoration;
     this.setDecorationAtLine(lineNo, decoration);
-  };
-
-  public prepareDecorations = (): void => {
-    const activeEditor: TextEditor = getActiveEditor();
-
-    const decorations: DecorationOptions[] = [];
-    const errorDecorations: DecorationOptions[] = [];
-
-    Object.keys(this._decorations).forEach(key => {
-      const lineNo: number = parseInt(key, 10);
-      const decorationData: WolfLineDecoration = this.getDecorationAtLine(
-        lineNo
-      );
-
-      if (!decorationData.data || activeEditor.document.lineCount < lineNo) {
-        return;
-      }
-
-      const textLine: TextLine = activeEditor.document.lineAt(lineNo - 1);
-      const decoration: DecorationOptions = this.createWolfDecorationOptions({
-        range: textLine.range,
-        text: decorationData.data.join(" => "),
-        hoverText: decorationData.pretty.join("\n"),
-        color: decorationData.error ? "red" : "cornflower"
-      } as WolfDecorationOptions);
-      (decorationData.error ? errorDecorations : decorations).push(decoration);
-    });
-
-    this._preparedDecorations = {
-      success: decorations,
-      error: errorDecorations
-    } as WolfSessionDecorations;
   };
 
   public reInitDecorationCollection = (): void => {
@@ -191,12 +165,58 @@ export class WolfDecorationsController {
     successColor: WolfColorSelection,
     errorColor: WolfColorSelection
   ): void => {
-    const successDecorationType = this.createGutterDecoration(successColor);
-    const errorDecorationType = this.createGutterDecoration(errorColor);
+    const successDecorationType = this.createEditorDecorationForGutters(
+      successColor
+    );
+    const errorDecorationType = this.createEditorDecorationForGutters(
+      errorColor
+    );
     this._decorationTypes = {
       success: successDecorationType,
       error: errorDecorationType
     };
+  };
+
+  public setPreparedDecorationsForActiveEditor = (): void => {
+    const activeEditor: TextEditor = getActiveEditor();
+    this.setPreparedDecorationsForEditor(activeEditor);
+  };
+
+  public setPreparedDecorationsForEditor = (editor: TextEditor): void => {
+    const decorations: DecorationOptions[] = [];
+    const errorDecorations: DecorationOptions[] = [];
+
+    Object.keys(this._decorations).forEach(key => {
+      const lineNo: number = parseInt(key, 10);
+      const lineIndex: number = lineNo - 1;
+      const decorationData: WolfLineDecoration = this.getDecorationAtLine(
+        lineNo
+      );
+
+      if (!decorationData.data || editor.document.lineCount < lineNo) {
+        return;
+      }
+
+      const textLine: TextLine = editor.document.lineAt(lineIndex);
+      const source = decorationData.source;
+      const decoRange = new Range(
+        new Position(lineIndex, textLine.firstNonWhitespaceCharacterIndex),
+        new Position(lineIndex, textLine.text.indexOf(source) + source.length)
+      );
+      const decoration: DecorationOptions = this.createWolfDecorationOptions({
+        // range: textLine.range,
+        range: decoRange,
+        text: decorationData.data.join(" => "),
+        hoverText: decorationData.pretty.join("\n"),
+        color: decorationData.error ? "red" : "cornflower"
+      } as WolfDecorationOptions);
+      (decorationData.error ? errorDecorations : decorations).push(decoration);
+    });
+
+    this._preparedDecorations = {
+      success: decorations,
+      error: errorDecorations
+    } as WolfSessionDecorations;
   };
 
   public shiftDecorationsDown = ({

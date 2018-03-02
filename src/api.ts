@@ -39,6 +39,7 @@ export function wolfStandardApiFactory(
 
 export class WolfAPI {
   private _endOfFile: number = 0;
+  private _lastMinFile: string = "";
   constructor(
     public context: ExtensionContext,
     public config: WorkspaceConfiguration,
@@ -48,7 +49,7 @@ export class WolfAPI {
     private _pythonTracer: PythonTracer
   ) {}
 
-  public startWolf = (): void => {
+  public stepInWolf = (): void => {
     this.decorations.setDefaultDecorationOptions("green", "red");
     this.sessions.createSessionFromEditor(this.activeEditor);
     this.updateLineCount(this.activeEditor.document.lineCount);
@@ -72,20 +73,13 @@ export class WolfAPI {
 
   public clearDecorationsForSession = (session: TextEditor): void => {
     const emptyDecorations = this.decorations.getEmptyDecorations();
-    this.setSessionDecorations(session, emptyDecorations);
-  };
-
-  public clearDecorationsForSessionByName = (name: string): void => {
-    const session = this.sessions.getSessionByName(name);
-    if (session) {
-      this.clearDecorationsForSession(session);
-    }
+    this.setDecorationsForSession(session, emptyDecorations);
   };
 
   public clearAllDecorations = (): void => {
     this.decorations.reInitDecorationCollection();
     for (let name of this.sessions.sessionNames) {
-      const session = this.sessions.getSessionByName(name);
+      const session = this.sessions.getSessionByFileName(name);
       this.clearDecorationsForSession(session);
     }
   };
@@ -95,33 +89,74 @@ export class WolfAPI {
     this.sessions.clearAllSessions();
   };
 
+  public handleDidChangeTextDocument = (
+    event: TextDocumentChangeEvent
+  ): void => {
+    this.updateStickys(event);
+  };
+
+  public handleDidSaveTextDocument = (trace: boolean): void => {
+    this.traceOrRenderPreparedDecorations(trace);
+  };
+
   public isDocumentWolfSession = (document: TextDocument): boolean => {
     return this.sessions.sessionIsActiveByDocument(document);
   };
 
-  public setDecorationsForActiveSession = (): void => {
-    const decorations = this.decorations.getPreparedDecorations();
-    this.setSessionDecorations(this.activeEditor, decorations);
+  private onPythonDataSuccess = (data): void => {
+    this.prepareAndRenderDecorationsForActiveSession(data);
+    if (this.printLogging) {
+      console.log(
+        "WOLF:",
+        JSON.stringify(
+          data.reduce((acc, i) => {
+            return {
+              ...acc,
+              [i.line_number]: [...(acc[i.line_number] || []), i.value]
+            };
+          }, {}),
+          null,
+          2
+        )
+      );
+    }
   };
 
-  private onPythonError = (data): void => {
-    console.log("WOLF STDERR OUPTUT:", data);
+  private onPythonDataError = (data): void => {
+    console.error("WOLF STDERR OUPTUT:", data);
   };
 
-  private prepareAndRenderParsedPythonData = (
+  private prepareAndRenderDecorationsForActiveSession = (
     data: WolfParsedTraceResults
   ): void => {
+    this.prepareAndRenderDecorationsForSession(this.activeEditor, data);
+  };
+
+  private prepareAndRenderDecorationsForSession = (
+    session: TextEditor,
+    data: WolfParsedTraceResults
+  ) => {
+    this.prepareParsedPythonData(data);
+    this.clearDecorationsForSession(session);
+    this.decorations.setPreparedDecorationsForEditor(session);
+    this.setPreparedDecorationsForSession(session);
+  };
+
+  private prepareParsedPythonData = (data: WolfParsedTraceResults): void => {
     data.forEach(this.decorations.parseLineAndSetDecoration);
-    this.renderPreparedDecorationsForActiveSession();
   };
 
   public renderPreparedDecorationsForActiveSession = (): void => {
-    this.clearDecorationsForActiveSession();
-    this.decorations.prepareDecorations();
-    this.setDecorationsForActiveSession();
+    this.renderPreparedDecorationsForSession(this.activeEditor);
   };
 
-  private setSessionDecorations = (
+  public renderPreparedDecorationsForSession = (session: TextEditor): void => {
+    this.clearDecorationsForSession(session);
+    this.decorations.setPreparedDecorationsForEditor(session);
+    this.setPreparedDecorationsForSession(session);
+  };
+
+  private setDecorationsForSession = (
     session: TextEditor,
     decorations: WolfSessionDecorations
   ): void => {
@@ -130,14 +165,23 @@ export class WolfAPI {
     session.setDecorations(decorationTypes.error, decorations.error);
   };
 
+  public setPreparedDecorationsForActiveSession = (): void => {
+    this.setPreparedDecorationsForSession(this.activeEditor);
+  };
+
+  public setPreparedDecorationsForSession = (session: TextEditor): void => {
+    const decorations = this.decorations.getPreparedDecorations();
+    this.setDecorationsForSession(session, decorations);
+  };
+
   public traceOrRenderPreparedDecorations = (trace: boolean): void => {
     if (trace) {
       this.decorations.reInitDecorationCollection();
       this.tracer.tracePythonScript({
         rootDir: this.rootExtensionDir,
         afterInstall: this.traceOrRenderPreparedDecorations, // Recurse if Hunter had to be installed first,
-        onData: this.prepareAndRenderParsedPythonData,
-        onError: this.onPythonError
+        onData: this.onPythonDataSuccess,
+        onError: this.onPythonDataError
       } as WolfTracerInterface);
     } else {
       this.renderPreparedDecorationsForActiveSession();
@@ -149,9 +193,16 @@ export class WolfAPI {
   };
 
   public updateStickys = (event: TextDocumentChangeEvent): void => {
-    this.stickys.updateStickyDecorations(event, this.oldLineCount);
-    this.renderPreparedDecorationsForActiveSession();
-    this.updateLineCount(event.document.lineCount);
+    if (this.isHot) {
+      this.stickys.updateStickyDecorations(event, this.oldLineCount);
+      this.renderPreparedDecorationsForActiveSession();
+      this.updateLineCount(event.document.lineCount);
+    }
+  };
+
+  public updateStickysHot = (event: TextDocumentChangeEvent): void => {
+    this.updateStickys(event);
+    this.activeEditor.document.save();
   };
 
   public get activeEditor() {
@@ -166,12 +217,24 @@ export class WolfAPI {
     return this._decorationController;
   }
 
+  public get isHot() {
+    return this.config.get("hot");
+  }
+
+  public get hotFrequency() {
+    return parseInt(this.config.get("hotFrequency"));
+  }
+
   public get oldLineCount() {
     return this._endOfFile;
   }
 
   public set oldLineCount(v: number) {
     this._endOfFile = v;
+  }
+
+  public get printLogging() {
+    return this.config.get("printLoggingEnabled");
   }
 
   public get rootExtensionDir() {
