@@ -36,6 +36,12 @@
           "default": 320,
           "description":
             "Updates the file on throttled text input. Makes Wolf feel more \"live\""
+        },
+        "wolf.disableHotModeWarning": {
+          "type": "boolean",
+          "default": false,
+          "description":
+            "Disables the warning upon entering a wolf session in Hot Mode."
         }
       }
     },

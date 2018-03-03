@@ -10,6 +10,7 @@ import {
 // import throttle from "lodash/throttle";
 
 import { wolfStandardApiFactory, WolfAPI } from "./api";
+import { hotModeWarningFactory } from "./hotWarning";
 import { ActiveTextEditorChangeEventResult } from "./types";
 import { clamp } from "./utils";
 
@@ -17,10 +18,22 @@ export function activate(context: ExtensionContext) {
   const wolfConfig: WorkspaceConfiguration = workspace.getConfiguration("wolf");
   const wolfAPI: WolfAPI = wolfStandardApiFactory(context, wolfConfig);
 
+  const hotWarning = hotModeWarningFactory(wolfConfig);
+
   function startWolf() {
-    wolfAPI.stepInWolf();
-    wolfAPI.enterWolfContext();
-    throttledHandleDidSaveTextDocument();
+    const _init = () => {
+      wolfAPI.stepInWolf();
+      wolfAPI.enterWolfContext();
+      throttledHandleDidSaveTextDocument();
+    };
+    if (wolfAPI.isHot) {
+      if (!wolfConfig.get("disableHotModeWarning")) {
+        return hotWarning(_init);
+      }
+      _init();
+    } else {
+      _init();
+    }
   }
 
   function stopWolf() {
