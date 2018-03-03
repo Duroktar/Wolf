@@ -19,6 +19,10 @@ color to red and can be clicked again to stop the session.
 
 ## Features
 
+### Wolf Feature Overview
+
+![busy-example](images/busy_example.png)
+
 ### Check out variables inline
 
 ![basic-example](images/basic_example.png)

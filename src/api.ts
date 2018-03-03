@@ -5,7 +5,8 @@ import {
 import {
   WolfSessionDecorations,
   WolfTracerInterface,
-  WolfParsedTraceResults
+  WolfParsedTraceResults,
+  WolfTraceLineResult
 } from "./types";
 import {
   commands,
@@ -39,7 +40,6 @@ export function wolfStandardApiFactory(
 
 export class WolfAPI {
   private _endOfFile: number = 0;
-  private _lastMinFile: string = "";
   constructor(
     public context: ExtensionContext,
     public config: WorkspaceConfiguration,
@@ -89,6 +89,26 @@ export class WolfAPI {
     this.sessions.clearAllSessions();
   };
 
+  public dataContainsErrorLines = (data: WolfParsedTraceResults): number => {
+    for (let line of data) {
+      if (line.error) {
+        return line.line_number;
+      }
+    }
+    return -1;
+  };
+
+  public filterParsedPythonData = (
+    visitor: (
+      value: WolfTraceLineResult,
+      index?: number,
+      collection?: WolfParsedTraceResults
+    ) => boolean,
+    data: WolfParsedTraceResults
+  ): WolfParsedTraceResults => {
+    return data.filter(visitor);
+  };
+
   public handleDidChangeTextDocument = (
     event: TextDocumentChangeEvent
   ): void => {
@@ -105,7 +125,7 @@ export class WolfAPI {
 
   private onPythonDataSuccess = (data): void => {
     this.prepareAndRenderDecorationsForActiveSession(data);
-    if (this.printLogging) {
+    if (true || this.printLogging) {
       console.log(
         "WOLF:",
         JSON.stringify(
@@ -143,7 +163,7 @@ export class WolfAPI {
   };
 
   private prepareParsedPythonData = (data: WolfParsedTraceResults): void => {
-    data.forEach(this.decorations.parseLineAndSetDecoration);
+    this.decorations.prepareParsedPythonData(data);
   };
 
   public renderPreparedDecorationsForActiveSession = (): void => {

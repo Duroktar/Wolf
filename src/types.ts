@@ -33,6 +33,7 @@ export interface WolfLineDecoration {
   loop: boolean;
   source: string;
   pretty: string[];
+  calls: number;
 }
 
 export interface WolfDecorationMapping {
@@ -64,6 +65,7 @@ export interface WolfTraceLineResult {
   source: string;
   pretty: string;
   error: boolean;
+  calls: number;
   _loop?: boolean;
 }
 

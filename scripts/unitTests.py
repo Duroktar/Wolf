@@ -3,16 +3,25 @@ import wolf
 import os
 
 
+def dirFactory(base):
+    return lambda target: os.path.join(base, target)
+
+
+__dirname = os.path.dirname(__file__)
+testDir = os.path.join(__dirname, 'testInputs')
+getTarget = dirFactory(testDir)
+
+
 class TestPythonEvaluator(unittest.TestCase):
 
-    testDir = os.path.dirname(__file__) + '/testInputs/'
-
     def test_simple_output(self):
-        returnStatus = wolf.main(self.testDir + "simpleOutput.py")
+        target = getTarget("simpleOutput.py")
+        returnStatus = wolf.main(target)
         assert returnStatus != 1
 
     def test_simple_code(self):
-        returnStatus = wolf.main(self.testDir + "simplestTest.py")
+        target = getTarget("simplestTest.py")
+        returnStatus = wolf.main(target)
         assert returnStatus != 1
 
 

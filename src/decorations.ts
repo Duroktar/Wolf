@@ -17,7 +17,8 @@ import {
   WolfLineDecoration,
   WolfSessionDecorations,
   WolfStandardDecorationTypes,
-  WolfTraceLineResult
+  WolfTraceLineResult,
+  WolfParsedTraceResults
 } from "./types";
 import { wolfTextColorProvider } from "./colors";
 import { wolfIconProvider } from "./icons";
@@ -34,6 +35,8 @@ export class WolfDecorationsController {
   private _decorations: WolfDecorationMapping = {};
   private _decorationTypes: WolfStandardDecorationTypes;
   private _preparedDecorations: WolfSessionDecorations;
+  private _hasErrorLine: number = -1;
+
   constructor(
     public context: ExtensionContext,
     public config: WorkspaceConfiguration
@@ -88,7 +91,7 @@ export class WolfDecorationsController {
     start: number,
     end: number,
     step?: number
-  ) => {
+  ): void => {
     for (let index = start + 1; index <= end + 1; index++) {
       delete this._decorations[index];
     }
@@ -97,6 +100,15 @@ export class WolfDecorationsController {
       swap: false,
       step: step || end - start
     });
+  };
+  public filterDecorationsAfterCallCount = (target: number): void => {
+    const newDecorations = {} as WolfDecorationMapping;
+    Object.keys(this._decorations).forEach(deco => {
+      if (this._decorations[deco].calls < target) {
+        newDecorations[deco] = this._decorations[deco];
+      }
+    });
+    this.setDecorations(newDecorations);
   };
 
   public getAllDecorations = (): WolfDecorationMapping => {
@@ -133,6 +145,12 @@ export class WolfDecorationsController {
     }
   };
 
+  public prepareParsedPythonData = (data: WolfParsedTraceResults): void => {
+    for (let line of data) {
+      this.parseLineAndSetDecoration(line);
+    }
+  };
+
   public parseLineAndSetDecoration = (line: WolfTraceLineResult): void => {
     const lineNo: number = line.line_number;
     const annotation = formatWolfResponseElement(line);
@@ -152,6 +170,10 @@ export class WolfDecorationsController {
 
   public reInitDecorationCollection = (): void => {
     this._decorations = {} as WolfDecorationMapping;
+  };
+
+  private setDecorations = (decorations: WolfDecorationMapping): void => {
+    this._decorations = decorations;
   };
 
   public setDecorationAtLine = (
@@ -265,6 +287,10 @@ export class WolfDecorationsController {
 
   public get collection(): WolfDecorationMapping {
     return this._decorations;
+  }
+
+  public get hasDecoratons(): boolean {
+    return Object.keys(this._decorations).length > 0;
   }
 
   public get pawprints(): boolean {

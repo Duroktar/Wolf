@@ -27,15 +27,16 @@ import re
 import json
 import signal
 import traceback
+import io
+from copy import deepcopy
 from pprint import pformat
 from functools import wraps
 from importlib import util
-from contextlib import contextmanager
-import functools
+from contextlib import contextmanager, redirect_stdout
 from threading import Thread
 
 try:
-    from hunter import trace
+    from hunter import trace, CallPrinter
 except ImportError:
     print('IMPORT_ERROR: hunter not installed.', file=sys.stderr)
     exit(1)
@@ -56,12 +57,35 @@ except ImportError:
 #   print               <- the expression being printed
 #
 # NOTE: See https://regex101.com/r/uRio5u/1 for demo
-_macro_re = r'^(?!pass)(?P<variable>\w+)$|print\((?P<print>.+)\)'
-WOLF_MACROS = re.compile(_macro_re)
+WOLF_MACROS = re.compile(r"""
+    ^(?!pass\s*|return\s*|continue\s*|if\s*|while\s*|for\s*) 
+        (
+            (?P<variable>\w+)$   # 
+            |
+            print\((?P<print>.+)\)
+            |
+            ^(?P<macro_source>(\w+\s+\=+\s+)*(?P<macro>[^#\s].+)\#\s?\?)[^\n]*
+        )
+""", re.VERBOSE)
 
+# For parsing CodePrinter output see:
+# https://regex101.com/r/sf6nAH/2
+
+
+def logout(*args, p=False):
+    if p:
+        print(pformat([pformat(i) for i in args]))
+    else:
+        print(pformat(args, width=200, indent=2), file=sys.stdout)
+
+
+def logerr(*args):
+    print(pformat(args, width=200, indent=2), file=sys.stderr)
 
 # Slightly modified code taken from:
 # https://www.saltycrane.com/blog/2010/04/using-python-timeout-decorator-uploading-s3/
+
+
 class TimeoutError(Exception):
     def __init__(self, value="Timed Out"):
         self.value = value
@@ -79,7 +103,7 @@ def timeout(seconds_before_timeout):
         # adapted from https://stackoverflow.com/questions/21827874/timeout-a-python-function-in-windows
         # Added v0.1.4 by Almenon
         def deco(func):
-            @functools.wraps(func)
+            @wraps(func)
             def wrapper(*args, **kwargs):
                 res = [_timeout_err]
 
@@ -192,7 +216,12 @@ def get_line_from_file(_file, lineno):
 #
 # WOLF[dict]: Results from each line trace
 WOLF = []
+COUNTER = 1
 #########
+
+
+def contains_any(*args):
+    return any(i in args[-1] for i in args[:-1])
 
 
 def resultifier(value):
@@ -221,7 +250,8 @@ def resultifier(value):
 def wolf_prints():
     # It's important that we create an output that can be handled
     # by the javascript `JSON.parse(...)` function.
-    results = [json.dumps(i) for i in WOLF if 'value' in i.keys()]
+    results = [json.dumps(i) for i in WOLF if contains_any(
+        'value', 'std_out', i.keys()) or i['error']]
     python_data = ", ".join(results)
 
     # DO NOT TOUCH, ie: no pretty printing
@@ -239,11 +269,13 @@ def try_eval(*args, **kw):
         if event['kind'] == 'line':
             metadata = {
                 "line_number":         event['lineno'],
+                "counter":                     COUNTER,
                 "source":      event['source'].strip(),
                 "kind":                  event['kind'],
-                "value":                       repr(e),
-                "pretty":                      repr(e),
+                "value":                        str(e),
+                "pretty":                       str(e),
                 "error":                          True,
+                "calls":                event['calls'],
             }
 
             WOLF.append(metadata)
@@ -263,6 +295,7 @@ def result_handler(event):
 
     # XXX: WARNING, SIDE EFFECTS MAY INCLUDE:
     global WOLF
+    global COUNTER
 
     # NOTE: Consider refactoring this using
     #      class variables instead of globals.
@@ -278,8 +311,9 @@ def result_handler(event):
     metadata = {
         "line_number":        event['lineno'],
         "kind":                 event['kind'],
-        "depth":               event['depth'],
         "source":     event['source'].strip(),
+        "counter":                    COUNTER,
+        "error":                        False,
         # "value"    <-  Defined below MAYBE..
         # "pretty"                  <-  SAME..
     }
@@ -300,27 +334,52 @@ def result_handler(event):
     # # how it works.
     match = WOLF_MACROS.search(source)
 
+    # if event.kind == 'exception':
+    #     logout('ARG --> ', repr(event.arg[0]))
+    # for key in dir(event):
+    #     logout(f"{key} -> ", event[key])
+    # value = try_eval(event.source.strip(),
+    #                  _globals, _locals, event=event)
+
     # Regex match groups are used for convenience.
     if match:
-
+        # else:
         # The simplest case is a variable, which we'll just
         # evaluate it directly.
         if match.group('variable'):
             value = try_eval(match.group('variable'),
                              _globals, _locals, event=event)
 
-        # In the case of "print", we evaluate and return the same
-        # expression passed in.
+        # For "print"s, we can evaluate the args passed in.
         if match.group('print'):
-            value = try_eval(match.group('print'),
-                             _globals, _locals, event=event)
+            buf = io.StringIO()
+            print(*try_eval(match.group('print'),
+                            _globals, _locals, event=event), file=buf)
+            value = str(buf.getvalue())
+            buf.close()
+
+        # For "print"s, we can evaluate the args passed in.
+        if match.group('macro'):
+            value = try_eval(match.group('macro').strip(),
+                             deepcopy(_globals), deepcopy(_locals), event=event)
+            metadata['source'] = match.group('macro_source')
+            # logout('MACRO VALUE -->', value)
+
+        # For "print"s, we can evaluate the args passed in.
+        if match.group('macro'):
+            value = try_eval(match.group('macro').strip(),
+                             deepcopy(_globals), deepcopy(_locals), event=event)
+            metadata['source'] = match.group('macro_source')
+            # logout('MACRO VALUE -->', value)
 
         metadata['value'] = resultifier(value)
 
         # And a nicely formatted version as well.
         metadata['pretty'] = pformat(value, indent=4, width=60)
 
+    # logout(metadata)
     WOLF.append(metadata)
+    COUNTER += 1
 
 
 def filename_filter(filename):
@@ -334,10 +393,11 @@ def filename_filter(filename):
             function. It captures the target filename for injection
             into the inner scope when the filter is actually run.
     """
+    # return lambda event: True
     return lambda event: bool(event['filename'] == filename)
 
 
-@timeout(5)
+# @timeout(5)
 def import_and_trace_script(module_name, module_path):
     """
         As the name suggests, this imports and traces the target script.
@@ -438,16 +498,23 @@ def main(filename):
             source = ""
         metadata = {
             "line_number":     lineno,
+            "counter":        COUNTER,
             "source":  source.strip(),
             "value":            value,
             "pretty":           value,
             "error":             True,
         }
-
-        # And tack the error on to our response.
+        # And tack the error on to the end of the response.
         WOLF.append(metadata)
 
+    else:
+        # Otherwise clip the final return code/message from the stack
+        # so it doesn't hide the last decoration.
+        WOLF.pop()
+
     if WOLF:
+        # For testing purposes
+        # logout(WOLF, p=True)
 
         # We must have some data ready for the client, let's print
         # the results and return a 0 for the exit code
