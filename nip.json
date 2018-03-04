@@ -1,11 +1,17 @@
 {
-    "name": "Wolf",
-    "author": "Scott Doucet",
-    "version": "0.1.0",
-    "scripts": {
-        "start": "python scripts/wolf.py scripts/test.py"
-    },
-    "dependencies": {
-        "hunter": "~=2.0.2"
-    }
+  "name": "Wolf",
+  "author": "Scott Doucet",
+  "version": "0.2.2",
+  "scripts": {
+    "test": "python scripts/wolf.py scripts/test.py",
+    "unittests": "python scripts/unitTests.py"
+  },
+  "dependencies": {
+    "hunter": "~=2.0.2"
+  },
+  "dev_dependencies": {
+    "autopep8": "~=1.3.4",
+    "flake8": "~=3.5.0",
+    "rope": "~=0.10.7"
+  }
 }
