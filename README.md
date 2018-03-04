@@ -1,5 +1,10 @@
 # Wolf - Live Python editing for VS-Code
 
+[![Version](https://vsmarketplacebadge.apphb.com/version-short/traBpUkciP.wolf.svg)](https://vsmarketplacebadge.apphb.com/version-short/traBpUkciP.wolf.svg)
+[![Build Status](https://travis-ci.org/Duroktar/Wolf.svg?branch=master)](https://travis-ci.org/Duroktar/Wolf)
+[![Downloads](https://vsmarketplacebadge.apphb.com/installs/traBpUkciP.wolf.svg)](https://vsmarketplacebadge.apphb.com/installs/traBpUkciP.wolf.svg)
+[![Rating](https://vsmarketplacebadge.apphb.com/rating/traBpUkciP.wolf.svg)](https://vsmarketplacebadge.apphb.com/rating/traBpUkciP.wolf.svg)
+
 Wolf is a VsCode extension that enables visual annotations of live Python code from inside the editor.
 
 Wolf is Good for:
@@ -342,7 +347,7 @@ on your own, if you just want to do that. Welcome one, welcome all!
 
 The following people have contributed to Wolf:
 
-[Almenon](https://github.com/Almenon) - Windows fix and Python 3.5 support and tests, as well as various other fixes and improvements ~ [#3](https://github.com/Duroktar/Wolf/pull/3)[#6](https://github.com/Duroktar/Wolf/pull/6)
+[Almenon](https://github.com/Almenon) - Windows fix and Python 3.5 support and tests, as well as various other fixes and improvements ~ [#3](https://github.com/Duroktar/Wolf/pull/3) [#6](https://github.com/Duroktar/Wolf/pull/6)
 
 ## License
 
