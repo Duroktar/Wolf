@@ -1,26 +1,15 @@
-import {
-  TextDocumentChangeEvent,
-  TextDocument,
-  TextEditor,
-  WorkspaceConfiguration
-} from "vscode";
+import { TextDocumentChangeEvent, TextDocument, TextEditor } from "vscode";
 import { annotatedLineIsChanged, getActiveEditor } from "./utils";
 import { WolfDecorationsController } from "./decorations";
 
 export function wolfStickyControllerFactory(
-  config: WorkspaceConfiguration,
   decorationController: WolfDecorationsController
 ) {
-  return new WolfStickyController(config, decorationController);
+  return new WolfStickyController(decorationController);
 }
 
 export class WolfStickyController {
-  constructor(
-    private config: WorkspaceConfiguration,
-    private decorationController: WolfDecorationsController
-  ) {
-    this.config;
-  }
+  constructor(private decorationController: WolfDecorationsController) {}
 
   public updateStickyDecorations = (
     event: TextDocumentChangeEvent,

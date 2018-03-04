@@ -6,9 +6,9 @@ import {
   window,
   TextLine,
   ExtensionContext,
-  WorkspaceConfiguration,
   Range,
-  Position
+  Position,
+  workspace
 } from "vscode";
 import {
   WolfColorSelection,
@@ -24,11 +24,8 @@ import { wolfTextColorProvider } from "./colors";
 import { wolfIconProvider } from "./icons";
 import { getActiveEditor, formatWolfResponseElement } from "./utils";
 
-export function wolfDecorationStoreFactory(
-  context: ExtensionContext,
-  config: WorkspaceConfiguration
-) {
-  return new WolfDecorationsController(context, config);
+export function wolfDecorationStoreFactory(context: ExtensionContext) {
+  return new WolfDecorationsController(context);
 }
 
 export class WolfDecorationsController {
@@ -36,10 +33,7 @@ export class WolfDecorationsController {
   private _decorationTypes: WolfStandardDecorationTypes;
   private _preparedDecorations: WolfSessionDecorations;
 
-  constructor(
-    public context: ExtensionContext,
-    public config: WorkspaceConfiguration
-  ) {}
+  constructor(public context: ExtensionContext) {}
 
   private createEditorDecorationForGutters = (
     gutterIconColor: WolfColorSelection,
@@ -225,9 +219,8 @@ export class WolfDecorationsController {
         new Position(lineIndex, textLine.text.indexOf(source) + source.length)
       );
       const decoration: DecorationOptions = this.createWolfDecorationOptions({
-        // range: textLine.range,
         range: decoRange,
-        text: decorationData.data.join(" => "),
+        text: decorationData.data.join(" => "), // This seperator should be adjustable from the config
         hoverText: decorationData.pretty.join("\n"),
         color: decorationData.error ? "red" : "cornflower"
       } as WolfDecorationOptions);
@@ -293,6 +286,8 @@ export class WolfDecorationsController {
   }
 
   public get pawprints(): boolean {
-    return this.config.get("pawPrintsInGutter") ? true : false;
+    return workspace.getConfiguration("wolf").get("pawPrintsInGutter")
+      ? true
+      : false;
   }
 }

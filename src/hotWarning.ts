@@ -1,10 +1,7 @@
-import { MessageItem, WorkspaceConfiguration, window } from "vscode";
+import { MessageItem, WorkspaceConfiguration, window, workspace } from "vscode";
 
-export function hotModeWarningFactory(config: WorkspaceConfiguration) {
-  return onSuccess => hotModeWarning(config, onSuccess);
-}
-
-function hotModeWarning(config: WorkspaceConfiguration, onSuccess: () => void) {
+export function hotModeWarning(onSuccess: () => void) {
+  const config: WorkspaceConfiguration = workspace.getConfiguration("wolf");
   const disableWarnings: MessageItem = { title: "Don't ask again" };
   if (config.get("disableHotModeWarning") !== true) {
     window

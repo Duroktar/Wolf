@@ -12,37 +12,33 @@ import {
   commands,
   extensions,
   ExtensionContext,
-  WorkspaceConfiguration,
   TextDocumentChangeEvent,
   TextDocument,
-  TextEditor
+  TextEditor,
+  workspace
 } from "vscode";
 import { WolfSessionController, wolfSessionStoreFactory } from "./sessions";
 import { WolfStickyController, wolfStickyControllerFactory } from "./sticky";
 import { PythonTracer, pythonTracerFactory } from "./tracer";
 import { getActiveEditor } from "./utils";
 
-export function wolfStandardApiFactory(
-  context: ExtensionContext,
-  config: WorkspaceConfiguration
-) {
-  const wolfDecorationStore = wolfDecorationStoreFactory(context, config);
+export function wolfStandardApiFactory(context: ExtensionContext) {
+  const wolfDecorationStore = wolfDecorationStoreFactory(context);
 
   return new WolfAPI(
     context,
-    config,
     wolfDecorationStore,
-    wolfSessionStoreFactory(config),
-    wolfStickyControllerFactory(config, wolfDecorationStore),
-    pythonTracerFactory(config)
+    wolfSessionStoreFactory(),
+    wolfStickyControllerFactory(wolfDecorationStore),
+    pythonTracerFactory()
   );
 }
 
 export class WolfAPI {
   private _endOfFile: number = 0;
+  public _changedConfigFlag: boolean = false;
   constructor(
     public context: ExtensionContext,
-    public config: WorkspaceConfiguration,
     private _decorationController: WolfDecorationsController,
     private _sessionController: WolfSessionController,
     private _stickyController: WolfStickyController,
@@ -125,7 +121,7 @@ export class WolfAPI {
 
   private onPythonDataSuccess = (data): void => {
     this.prepareAndRenderDecorationsForActiveSession(data);
-    if (true || this.printLogging) {
+    if (this.printLogging) {
       console.log(
         "WOLF:",
         JSON.stringify(
@@ -175,6 +171,10 @@ export class WolfAPI {
     this.decorations.setPreparedDecorationsForEditor(session);
     this.setPreparedDecorationsForSession(session);
   };
+
+  public setConfigUpdatedFlag(v: boolean) {
+    this._changedConfigFlag = v;
+  }
 
   private setDecorationsForSession = (
     session: TextEditor,
@@ -233,8 +233,20 @@ export class WolfAPI {
     return getActiveEditor().document.isDirty;
   }
 
+  public get config() {
+    return workspace.getConfiguration("wolf");
+  }
+
+  public get configChanged() {
+    return this._changedConfigFlag;
+  }
+
   public get decorations() {
     return this._decorationController;
+  }
+
+  public get hotModeWarningDisabled() {
+    return this.config.get("disableHotModeWarning");
   }
 
   public get isHot() {

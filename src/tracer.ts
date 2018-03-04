@@ -2,19 +2,14 @@ import * as path from "path";
 import { installHunter } from "./hunterInstaller";
 import { WolfTracerInterface, WolfParsedTraceResults } from "./types";
 import { getActiveEditor, getActiveFileName, indexOrLast } from "./utils";
-import { WorkspaceConfiguration } from "vscode";
 
 const { spawn } = require("child_process");
 
-export function pythonTracerFactory(config: WorkspaceConfiguration) {
-  return new PythonTracer(config);
+export function pythonTracerFactory() {
+  return new PythonTracer();
 }
 
 export class PythonTracer {
-  constructor(private config: WorkspaceConfiguration) {
-    this.config;
-  }
-
   private getPythonRunner(rootDir) {
     const scriptName: string = getActiveFileName();
     const wolfPath: string = path.join(rootDir, "scripts/wolf.py");

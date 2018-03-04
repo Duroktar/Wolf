@@ -3,22 +3,16 @@ import {
   Disposable,
   ExtensionContext,
   TextDocument,
-  TextDocumentChangeEvent,
-  WorkspaceConfiguration,
-  workspace
+  TextDocumentChangeEvent
 } from "vscode";
-// import throttle from "lodash/throttle";
 
 import { wolfStandardApiFactory, WolfAPI } from "./api";
-import { hotModeWarningFactory } from "./hotWarning";
+import { hotModeWarning } from "./hotWarning";
 import { ActiveTextEditorChangeEventResult } from "./types";
 import { clamp } from "./utils";
 
 export function activate(context: ExtensionContext) {
-  const wolfConfig: WorkspaceConfiguration = workspace.getConfiguration("wolf");
-  const wolfAPI: WolfAPI = wolfStandardApiFactory(context, wolfConfig);
-
-  const hotWarning = hotModeWarningFactory(wolfConfig);
+  const wolfAPI: WolfAPI = wolfStandardApiFactory(context);
 
   function startWolf() {
     const _init = () => {
@@ -26,14 +20,10 @@ export function activate(context: ExtensionContext) {
       wolfAPI.enterWolfContext();
       throttledHandleDidSaveTextDocument();
     };
-    if (wolfAPI.isHot) {
-      if (!wolfConfig.get("disableHotModeWarning")) {
-        return hotWarning(_init);
-      }
-      _init();
-    } else {
-      _init();
+    if (wolfAPI.isHot && !wolfAPI.hotModeWarningDisabled) {
+      return hotModeWarning(_init);
     }
+    _init();
   }
 
   function stopWolf() {
@@ -87,14 +77,28 @@ export function activate(context: ExtensionContext) {
     context.subscriptions
   );
 
+  vscode.workspace.onDidChangeConfiguration(
+    handleDidChangeConfiguration,
+    null,
+    context.subscriptions
+  );
+
   function handleDidChangeActiveTextEditor(
     editor: ActiveTextEditorChangeEventResult
   ): void {
     if (editor) {
       wolfAPI.updateLineCount(editor.document.lineCount);
       if (wolfAPI.sessions.sessionIsActiveByDocument(editor.document)) {
-        throttledHandleDidSaveTextDocument(false);
-        wolfAPI.enterWolfContext();
+        if (wolfAPI.configChanged) {
+          vscode.window.showInformationMessage(
+            "Wolf detected a change to its configuration and was shut off. Please start Wolf again to continue."
+          );
+          wolfAPI.setConfigUpdatedFlag(false);
+          stopWolf();
+        } else {
+          throttledHandleDidSaveTextDocument(false);
+          wolfAPI.enterWolfContext();
+        }
       } else {
         wolfAPI.exitWolfContext();
       }
@@ -114,6 +118,16 @@ export function activate(context: ExtensionContext) {
     if (wolfAPI.isDocumentWolfSession(document)) {
       wolfAPI.updateLineCount(document.lineCount);
       throttledHandleDidSaveTextDocument(true);
+    }
+  }
+
+  function handleDidChangeConfiguration(event) {
+    if (
+      event.affectsConfiguration("wolf.hot") ||
+      event.affectsConfiguration("wolf.pawPrintsInGutter") ||
+      event.affectsConfiguration("wolf.hotFrequency")
+    ) {
+      wolfAPI.setConfigUpdatedFlag(true);
     }
   }
 
