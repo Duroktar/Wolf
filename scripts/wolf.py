@@ -393,11 +393,10 @@ def filename_filter(filename):
             function. It captures the target filename for injection
             into the inner scope when the filter is actually run.
     """
-    # return lambda event: True
     return lambda event: bool(event['filename'] == filename)
 
 
-# @timeout(5)
+@timeout(10)
 def import_and_trace_script(module_name, module_path):
     """
         As the name suggests, this imports and traces the target script.
