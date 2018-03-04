@@ -35,7 +35,6 @@ export class WolfDecorationsController {
   private _decorations: WolfDecorationMapping = {};
   private _decorationTypes: WolfStandardDecorationTypes;
   private _preparedDecorations: WolfSessionDecorations;
-  private _hasErrorLine: number = -1;
 
   constructor(
     public context: ExtensionContext,
