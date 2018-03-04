@@ -1,6 +1,6 @@
-# Wolf - It kicks the Quokkas ass
+# Wolf - Live Python editing for VS-Code
 
-Wolf is a VsCode extension that enables live inspection of Python code in the editor.
+Wolf is a VsCode extension that enables visual annotations of live Python code from inside the editor.
 
 Wolf is Good for:
 
@@ -19,17 +19,26 @@ color to red and can be clicked again to stop the session.
 
 ## Features
 
+### Wolf Feature Overview
+
+![busy-example](images/busy_example.png)
+
+> `ProTip`: To enable `PawPrint` gutter icons, set the configuration
+> option `"wolf.pawPrintsInGutter": true`
+
+> `NOTE`: Requires restarting the Editor.
+
 ### Check out variables inline
 
 ![basic-example](images/basic_example.png)
 
-> NOTE: For this to work you must put only the variable
+> `NOTE`: For this to work you must put only the variable
 > name and not an expression; the annotations (16)
 > cannot be edited.
 
 ---
 
-### Works inside functions!
+### Works inside functions
 
 ![functions-example](images/functions_example.png)
 
@@ -57,12 +66,18 @@ color to red and can be clicked again to stop the session.
 
 ---
 
-### Works with http requests!
+### Works with http requests
 
 ![requests-example](images/requests_example.png)
 
 > NOTE: Please see FAQ section "Will APIs Hate Me?"
 > before making requests with Wolf.
+
+---
+
+### Comment Macros
+
+![macro-example](images/macro_example.png)
 
 ---
 
@@ -120,21 +135,6 @@ throttling by default.
 Here's an example using [diskcache](https://pypi.python.org/pypi/diskcache/):
 ![diskcache-example](images/diskcache_example.png)
 
-### Do you hate Quokka?
-
-No, I love it. I set out to learn how to decorate text in vscode
-and was looking for inspiration, I use Quokka all the time while
-hacking away in JS land, and just really missed it when it came
-to Python. So I set to work on a simple clone and initially thought
-that I would hit a wall very quickly when it came to anything
-more than simple regex based stuff in the global scope of the
-script. I stumbled upon Hunter almost by accident (Back button
-was blurred, so I must have opened it in a new tab.. Probably
-reddit), there it was on PyPi with a screenshot _doing exactly
-what I needed_. I spent a day on it tops so far and here we are
-now. So, again, I love Quokka, and recommend it to everyone
-using Javascript. But at the end of the day, the Wolf eats the Quokka.. ;)
-
 ### Wolf is stupid.. PDB is better
 
 ![pdb](https://memecreator.org/static/images/memes/4713467.jpg)
@@ -153,6 +153,69 @@ You can't get any better than _live feedback next to the code you're editing_!
 ---
 
 ## **Changelog**
+
+## v0.2.0 ~ Minor Release
+
+### Hot Reloading
+
+Turn on Hot Mode to enable live reloading of code as you work. You can set the
+minimum frequency from the user settings if you want more control over when your
+file is saved/run.
+
+_Turn on Live Reloading:_
+
+    "wolf.hot": true
+
+Adjust minimum time between saves (throttle control) in milliseconds:
+
+    "wolf.hotFrequency": 270
+
+> Note: Frequency setting is clamped between 100 and 1000 millisecends
+
+### Macros are Back
+
+A comment macro is any single line comment character (pound/hash symbol)
+followed by a question mark. See the examples above to get a better idea
+of how they work, and check out the macro syntax rules below.
+
+Syntax:
+
+    some.expression()           #?  <----Comment Macro
+    a = [i for i in some_list]  # ?  <----Space allowed
+
+> Note: Macros are restricted on lines starting with these
+> blacklisted tokens.
+
+* continue
+* pass
+* return
+* if
+* for
+* while
+
+  return 0 #? <---Restriced, won't work
+
+### Completely Rewritten Codebase
+
+Efforts have been made to improve the structure of the core Wolf
+extension to allow for easier updates and more powerful features
+in the future.
+
+### ReWritten Sticky Logic
+
+Wolf now uses the builtin API for improving the sticky behavior of
+line decorations, especially while coding with Hot Reloading turned
+off.
+
+### Overview Ruler Markers
+
+Annotated lines now show up in the OverView ruler panel on the left side
+and are color coded for easy visual grepping.
+
+### Hover Information
+
+Hover over any Wolf annotation to see the value pretty printed in a
+popup box.
 
 ## v0.1.7
 
@@ -279,7 +342,7 @@ on your own, if you just want to do that. Welcome one, welcome all!
 
 The following people have contributed to Wolf:
 
-[Almenon](https://github.com/Almenon) - Windows fix and Python 3.5 support ~ [#3](https://github.com/Duroktar/Wolf/pull/3)
+[Almenon](https://github.com/Almenon) - Windows fix and Python 3.5 support and tests, as well as various other fixes and improvements ~ [#3](https://github.com/Duroktar/Wolf/pull/3)[#6](https://github.com/Duroktar/Wolf/pull/6)
 
 ## License
 
