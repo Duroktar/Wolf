@@ -56,17 +56,9 @@ except ImportError:
 #   variable            <- the simplest case, a single variable
 #   print               <- the expression being printed
 #
-# NOTE: See https://regex101.com/r/uRio5u/1 for demo
-WOLF_MACROS = re.compile(r"""
-    ^(?!pass\s*|return\s*|continue\s*|if\s*|while\s*|for\s*) 
-        (
-            (?P<variable>\w+)$   # 
-            |
-            print\((?P<print>.+)\)
-            |
-            ^(?P<macro_source>(\w+\s+\=+\s+)*(?P<macro>[^#\s].+)\#\s?\?)[^\n]*
-        )
-""", re.VERBOSE)
+# NOTE: See https://regex101.com/r/sf6nAH/13 for demo
+WOLF_MACROS = re.compile(
+    r"^(?!pass\s+|return\s+|continue\s+|if\s+|for\s+)((?P<variable>\w+)$|^(print\((?P<print>.+)\))|^(?P<macro_source>(?P<local>\w+\s)*((?P<assignment>\=)?(?P<operand>\+\=|\-\=|\*\=|\\\=)* *)*(?P<macro>[^#\s].+)\#\s?\?[^\n]*))")
 
 # For parsing CodePrinter output see:
 # https://regex101.com/r/sf6nAH/2
@@ -259,7 +251,7 @@ def wolf_prints():
     ######################################
 
 
-def try_eval(*args, **kw):
+def parse_eval(*args, **kw):
     global WOLF
     event = kw.get('event')
 
@@ -338,7 +330,7 @@ def result_handler(event):
     #     logout('ARG --> ', repr(event.arg[0]))
     # for key in dir(event):
     #     logout(f"{key} -> ", event[key])
-    # value = try_eval(event.source.strip(),
+    # value = parse_eval(event.source.strip(),
     #                  _globals, _locals, event=event)
 
     # Regex match groups are used for convenience.
@@ -347,14 +339,14 @@ def result_handler(event):
         # The simplest case is a variable, which we'll just
         # evaluate it directly.
         if match.group('variable'):
-            value = try_eval(match.group('variable'),
-                             _globals, _locals, event=event)
+            value = parse_eval(match.group('variable'),
+                               _globals, _locals, event=event)
 
         # For "print"s, we can evaluate the args passed in.
         if match.group('print'):
             buf = io.StringIO()
-            to_print = try_eval(match.group('print'),
-                                _globals, _locals, event=event)
+            to_print = parse_eval(match.group('print'),
+                                  _globals, _locals, event=event)
             if isinstance(to_print, list):
                 print(*to_print, file=buf)
             else:
@@ -362,26 +354,21 @@ def result_handler(event):
             value = str(buf.getvalue())
             buf.close()
 
-        # For "print"s, we can evaluate the args passed in.
         if match.group('macro'):
-            value = try_eval(match.group('macro').strip(),
-                             deepcopy(_globals), deepcopy(_locals), event=event)
-            metadata['source'] = match.group('macro_source')
-            # logout('MACRO VALUE -->', value)
+            value = parse_eval(match.group('macro').strip(),
+                               deepcopy(_globals), deepcopy(_locals), event=event)
 
-        # For "print"s, we can evaluate the args passed in.
-        if match.group('macro'):
-            value = try_eval(match.group('macro').strip(),
-                             deepcopy(_globals), deepcopy(_locals), event=event)
+            if match.group('operand'):
+                assignee = parse_eval(match.group('local').strip(),
+                                      deepcopy(_globals), deepcopy(_locals), event=event)
+                value = eval("{} {} {}".format(assignee,
+                                               match.group('operand').strip()[0], value))
+
             metadata['source'] = match.group('macro_source')
-            # logout('MACRO VALUE -->', value)
 
         metadata['value'] = resultifier(value)
-
-        # And a nicely formatted version as well.
         metadata['pretty'] = pformat(value, indent=4, width=60)
 
-    # logout(metadata)
     WOLF.append(metadata)
     COUNTER += 1
 

@@ -24,15 +24,17 @@ def contains_any(*args):
     return any(i in args[-1] for i in args[:-1])
 
 
-# b = contains_any('hat', 'cat', ['jeff', 'sam', 'cat'])
-# b
+def add(a):
+    rv = a + 2
+    rv
+    return rv
 
-# a = 1
 
-# while True:
-#     sleep(1)
-#     print('Tick', a)
-#     a += 1
+a = add(1)  # ?
+a += add(2)  # ?
+a += add(3)
+
+a
 
 b = [1, 2]  # ?
 
