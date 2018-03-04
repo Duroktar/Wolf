@@ -21,13 +21,13 @@
       "properties": {
         "wolf.pawPrintsInGutter": {
           "type": "boolean",
-          "default": false,
+          "default": true,
           "description":
             "Use Paw Print style icons in the gutters. (Requires restart)"
         },
         "wolf.hot": {
           "type": "boolean",
-          "default": false,
+          "default": true,
           "description":
             "Updates the file on throttled text input. Makes Wolf feel more \"live\""
         },
