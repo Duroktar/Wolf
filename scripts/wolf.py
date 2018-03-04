@@ -51,16 +51,11 @@ except ImportError:
 # want the expression being printed, if it's a
 # single variable, we want that.
 #
-# XXX: This will NOT work with destructured assignments.
-# Named search groups are returned for convenience:
-#   variable            <- the simplest case, a single variable
-#   print               <- the expression being printed
-#
-# NOTE: See https://regex101.com/r/sf6nAH/13 for demo
+# NOTE: See https://regex101.com/r/sf6nAH/15 for more info
 WOLF_MACROS = re.compile(
-    r"^(?!pass\s+|return\s+|continue\s+|if\s+|for\s+)((?P<variable>\w+)$|^(print\((?P<print>.+)\))|^(?P<macro_source>(?P<local>\w+\s)*((?P<assignment>\=)?(?P<operand>\+\=|\-\=|\*\=|\\\=)* *)*(?P<macro>[^#\s].+)\#\s?\?[^\n]*))")
+    r"^(?!pass\s+|return\s+|continue\s+|if\s+|for\s+)((?P<variable>\w+)$|^(print\((?P<print>.+)\))|^(?P<macro_source>(?P<local>[^\d\W]+\s)*((?P<assignment>\=)?(?P<operator>\+\=|\-\=|\*\=|\\\=)* *)*(?P<macro>[^#\s].+)\#\s?\?[^\n]*))")
 
-# For parsing CodePrinter output see:
+# XXX: For parsing hunter.CodePrinter output see:
 # https://regex101.com/r/sf6nAH/2
 
 
@@ -259,13 +254,14 @@ def parse_eval(*args, **kw):
         rv = eval(*args)
     except Exception as e:
         if event['kind'] == 'line':
+            value = traceback.format_exception_only(type(e), e)[0]
             metadata = {
                 "line_number":         event['lineno'],
                 "counter":                     COUNTER,
                 "source":      event['source'].strip(),
                 "kind":                  event['kind'],
-                "value":                        str(e),
-                "pretty":                       str(e),
+                "value":                         value,
+                "pretty":                        value,
                 "error":                          True,
                 "calls":                event['calls'],
             }
@@ -326,49 +322,65 @@ def result_handler(event):
     # # how it works.
     match = WOLF_MACROS.search(source)
 
-    # if event.kind == 'exception':
-    #     logout('ARG --> ', repr(event.arg[0]))
-    # for key in dir(event):
-    #     logout(f"{key} -> ", event[key])
-    # value = parse_eval(event.source.strip(),
-    #                  _globals, _locals, event=event)
-
     # Regex match groups are used for convenience.
     if match:
-        # else:
-        # The simplest case is a variable, which we'll just
-        # evaluate it directly.
+
+        # Simplest case.
         if match.group('variable'):
             value = parse_eval(match.group('variable'),
                                _globals, _locals, event=event)
 
-        # For "print"s, we can evaluate the args passed in.
+        # A little magic to parse print args
         if match.group('print'):
             buf = io.StringIO()
             to_print = parse_eval(match.group('print'),
                                   _globals, _locals, event=event)
-            if isinstance(to_print, list):
+            if isinstance(to_print, list) or isinstance(to_print, tuple):
+                # Handle unpacking iterables
                 print(*to_print, file=buf)
             else:
+                # Plain ol' value
                 print(to_print, file=buf)
             value = str(buf.getvalue())
             buf.close()
 
+        # Macros require a few more steps..
         if match.group('macro'):
+
+            # XXX: This is to help avoid side effects when evaluating expressions
+            m_locals_copy = deepcopy(_locals)
+            m_globals_copy = deepcopy(_globals)
+
+            # The expression to be evaluated
             value = parse_eval(match.group('macro').strip(),
-                               deepcopy(_globals), deepcopy(_locals), event=event)
+                               m_globals_copy, m_locals_copy, event=event)
 
-            if match.group('operand'):
-                assignee = parse_eval(match.group('local').strip(),
-                                      deepcopy(_globals), deepcopy(_locals), event=event)
-                value = eval("{} {} {}".format(assignee,
-                                               match.group('operand').strip()[0], value))
+            # Value is being assigned to a variable (local)
+            if match.group('local'):
+                # Get the variable name
+                local_name = match.group('local').strip()
 
+                # This is for += -= *= and /= assignments
+                if match.group('operator'):
+                    # This get the value of the local variable from earlier
+                    left_side_value = parse_eval(local_name,
+                                                 m_globals_copy, m_locals_copy, event=event)
+
+                    # This evaluates the statement with the infixed operator
+                    value = parse_eval("{} {} {}".format(left_side_value,
+                                                         match.group('operator').strip()[0], value), event=event)
+
+                # Make sure to display the output as a variable assignment
+                value = "{} = {}".format(local_name, value)
+
+            # This provides the entire source line for diffing during sticky updates
             metadata['source'] = match.group('macro_source')
 
+        # Final results are formatted
         metadata['value'] = resultifier(value)
         metadata['pretty'] = pformat(value, indent=4, width=60)
 
+    # And lastly, update our WOLF results list
     WOLF.append(metadata)
     COUNTER += 1
 
@@ -396,6 +408,16 @@ def import_and_trace_script(module_name, module_path):
         to the result_handler function.
 
         NOTE: script_path is necessary here for relative imports to work
+    """
+    with script_path(os.path.abspath(os.path.dirname(module_path))):
+        with trace(filename_filter(module_path), action=result_handler):
+            import_file(module_name, module_path)
+
+
+def debug_import_and_trace_script(module_name, module_path):
+    """
+        XXX: For testing purposes.. This bypasses the timeout which would
+        otherwise stop the debugging sessions when the timeout expires.
     """
     with script_path(os.path.abspath(os.path.dirname(module_path))):
         with trace(filename_filter(module_path), action=result_handler):
@@ -450,11 +472,17 @@ def main(filename):
                 NOTE: May return wrong index if parsing the script
                 for Home Alone. /jk
 
-        """
+        XXX: This script can now be debugged from VS-Code. Simply choose
+        `wolf.py Debug Session` from the list to start debugging with the
+        `./test.py` selected as input automatically.
+    """
     if not os.path.exists(filename):
         message = "EXISTS_ERROR: " + filename + " doesn't exist"
         print(message, file=sys.stderr)
         return 1
+
+    # If this is for debugging, we'll need to disable the timeout..
+    debug_session = os.environ.get('WOLF_DEBUG_SESSION', False)
 
     # The full path to the script (including filename and extension)
     full_path = os.path.abspath(filename)
@@ -465,29 +493,29 @@ def main(filename):
 
     # Okay, so let's go ahead and fire this thing up.
     try:
-
-        import_and_trace_script(module_name, full_path)
+        if debug_session == 'true':
+            debug_import_and_trace_script(module_name, full_path)
+        else:
+            import_and_trace_script(module_name, full_path)
 
     except Exception as e:
 
         # If there's an error, we try to handle it and
         # send back data that can be used to decorate
         # the offending line.
-        #
-        # NOTE: I prefer the `repr(e)` over inspects object
-        # repr, so I decided to use that instead.
+
+        # TODO: This is a gd mess. I need to sort this out, bad..
         _, _, exc_traceback = sys.exc_info()
+        value = traceback.format_exception_only(type(e), e)[0]
         tb = traceback.extract_tb(exc_traceback)[-1]
         if isinstance(e, SyntaxError):
             lineno = getattr(e, 'lineno')
-            value = getattr(e, 'msg')
-            source = get_line_from_file(full_path, tb[1])
         else:
             lineno = tb[1]
-            value = str(e)
-            source = ""
+        source = get_line_from_file(full_path, tb[1])
         metadata = {
             "line_number":     lineno,
+            "kind":            'line',
             "counter":        COUNTER,
             "source":  source.strip(),
             "value":            value,

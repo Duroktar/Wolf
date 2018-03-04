@@ -3,28 +3,16 @@
   "version": "0.1.0",
   "configurations": [
     {
-      "name": "Integrated Terminal/Console",
-      "type": "python",
-      "request": "launch",
-      "stopOnEntry": true,
-      "pythonPath": "${workspaceFolder}/python_modules/bin/python3",
-      "program": "${workspaceFolder}/scripts/wolf.py",
-      "cwd": "",
-      "console": "integratedTerminal",
-      "env": {},
-      "envFile": "${workspaceFolder}/.env",
-      "debugOptions": [],
-      "args": ["${workspaceFolder}/scripts/test.py"]
-    },
-    {
-      "name": "Python",
+      "name": "wolf.py Debug Session",
       "type": "python",
       "request": "launch",
       "stopOnEntry": true,
       "pythonPath": "${workspaceFolder}/python_modules/bin/python3",
       "program": "${workspaceFolder}/scripts/wolf.py",
       "cwd": "${workspaceFolder}",
-      "env": {},
+      "env": {
+        "WOLF_DEBUG_SESSION": true
+      },
       "envFile": "${workspaceFolder}/.env",
       "debugOptions": ["RedirectOutput"],
       "args": ["${workspaceFolder}/scripts/test.py"]
