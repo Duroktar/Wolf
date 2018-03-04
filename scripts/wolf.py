@@ -353,8 +353,12 @@ def result_handler(event):
         # For "print"s, we can evaluate the args passed in.
         if match.group('print'):
             buf = io.StringIO()
-            print(*try_eval(match.group('print'),
-                            _globals, _locals, event=event), file=buf)
+            to_print = try_eval(match.group('print'),
+                                _globals, _locals, event=event)
+            if isinstance(to_print, list):
+                print(*to_print, file=buf)
+            else:
+                print(to_print, file=buf)
             value = str(buf.getvalue())
             buf.close()
 
