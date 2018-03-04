@@ -1,4 +1,4 @@
-# Wolf - It kicks the Quokkas ass  [![Build Status](https://travis-ci.org/Almenon/Wolf.svg?branch=v0.2.0pre)](https://travis-ci.org/Almenon/Wolf)
+# Wolf - It kicks the Quokkas ass
 
 [![Version](https://vsmarketplacebadge.apphb.com/version-short/traBpUkciP.wolf.svg)](https://vsmarketplacebadge.apphb.com/version-short/traBpUkciP.wolf.svg)
 [![Build Status](https://travis-ci.org/Duroktar/Wolf.svg?branch=master)](https://travis-ci.org/Duroktar/Wolf)
