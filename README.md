@@ -5,7 +5,7 @@
 [![Downloads](https://vsmarketplacebadge.apphb.com/installs/traBpUkciP.wolf.svg)](https://vsmarketplacebadge.apphb.com/installs/traBpUkciP.wolf.svg)
 [![Rating](https://vsmarketplacebadge.apphb.com/rating/traBpUkciP.wolf.svg)](https://vsmarketplacebadge.apphb.com/rating/traBpUkciP.wolf.svg)
 
-Wolf is a VsCode extension that enables visual annotations of live Python code from inside the editor.
+Wolf is a VsCode extension that enables visual inspection of live Python code from the editor. It was inspired by [`Quokka.js:`](https://quokkajs.com/) `The Rapid Prototyping Playground for JavaScript and TypeScript` and my love of programming.
 
 Wolf is Good for:
 
@@ -16,22 +16,11 @@ Wolf is Good for:
 * Code Streamers
 * Planet Earth
 
-## Usage
-
-Click the blue Wolf in the upper right action bar inside any open Python source
-file to start a session. Once inside a running session, the Wolf icon will change
-color to red and can be clicked again to stop the session.
-
-## Features
-
-### Wolf Feature Overview
+## Wolf Feature Overview
 
 ![busy-example](images/busy_example.png)
 
-> `ProTip`: To enable `PawPrint` gutter icons, set the configuration
-> option `"wolf.pawPrintsInGutter": true`
-
-> `NOTE`: Requires restarting the Editor.
+## Other features
 
 ### Check out variables inline
 
@@ -86,6 +75,11 @@ color to red and can be clicked again to stop the session.
 
 ---
 
+## What people are saying about Wolf
+
+* **Very impressive work!** ~ [Quokka.js](https://quokkajs.com/)
+* **What the hell does it do?** ~ My Wife
+
 ## Requirements
 
 * Visual Studio Code
@@ -105,6 +99,10 @@ This extension contributes the following settings:
 
 * `wolf.barkAtCurrentFile`: Starts Wolf on the current file.
 * `wolf.stopBarking`: Stops all running Wolf sessions.
+* `wolf.pawPrintsInGutter`: Use paw prints for gutter icons.
+* `wolf.hot`: For enabling live re-loading.
+* `wolf.disableHotModeWarning`: For enabling live re-loading.
+* `wolf.hotFrequency`: Adjust the minimum timeframe before the file is saved during Hot Mode
 
 ## FAQ
 
@@ -177,7 +175,7 @@ Adjust minimum time between saves (throttle control) in milliseconds:
 
 > Note: Frequency setting is clamped between 100 and 1000 millisecends
 
-### Macros are Back
+### Macros are Back!!!
 
 A comment macro is any single line comment character (pound/hash symbol)
 followed by a question mark. See the examples above to get a better idea
