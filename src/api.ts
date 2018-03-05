@@ -88,7 +88,7 @@ export class WolfAPI {
   public dataContainsErrorLines = (data: WolfParsedTraceResults): number => {
     for (let line of data) {
       if (line.error) {
-        return line.line_number;
+        return line.lineno;
       }
     }
     return -1;
@@ -119,22 +119,11 @@ export class WolfAPI {
     return this.sessions.sessionIsActiveByDocument(document);
   };
 
-  private onPythonDataSuccess = (data): void => {
+  private onPythonDataSuccess = (data: WolfParsedTraceResults): void => {
     this.prepareAndRenderDecorationsForActiveSession(data);
     if (this.printLogging) {
-      console.log(
-        "WOLF:",
-        JSON.stringify(
-          data.reduce((acc, i) => {
-            return {
-              ...acc,
-              [i.line_number]: [...(acc[i.line_number] || []), i.value]
-            };
-          }, {}),
-          null,
-          2
-        )
-      );
+      console.log("WOLF:", JSON.stringify(data, null, 4));
+      console.log("Wolf Total Line Count:", data.length);
     }
   };
 
