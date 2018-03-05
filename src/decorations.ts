@@ -18,11 +18,13 @@ import {
   WolfSessionDecorations,
   WolfStandardDecorationTypes,
   WolfTraceLineResult,
-  WolfParsedTraceResults
+  WolfParsedTraceResults,
+  WolfValue
 } from "./types";
 import { wolfTextColorProvider } from "./colors";
 import { wolfIconProvider } from "./icons";
 import { getActiveEditor, formatWolfResponseElement } from "./utils";
+const beautify = require("js-beautify").js;
 
 export function wolfDecorationStoreFactory(context: ExtensionContext) {
   return new WolfDecorationsController(context);
@@ -145,8 +147,12 @@ export class WolfDecorationsController {
   };
 
   public parseLineAndSetDecoration = (line: WolfTraceLineResult): void => {
-    const lineNo: number = line.line_number;
-    const annotation = formatWolfResponseElement(line);
+    const annotation: WolfValue = formatWolfResponseElement(line);
+    const lineNo: number = line.lineno;
+    const pretty: string = beautify(line.value, {
+      indent_size: 4,
+      space_in_empty_paren: true
+    });
     const existing: WolfLineDecoration = this.getLineDecorationOrDefault(
       lineNo
     );
@@ -156,7 +162,7 @@ export class WolfDecorationsController {
       error: line.error ? true : false,
       loop: line.hasOwnProperty("_loop"),
       source: line.source,
-      pretty: [...existing.pretty, line.pretty]
+      pretty: [...existing.pretty, pretty]
     } as WolfLineDecoration;
     this.setDecorationAtLine(lineNo, decoration);
   };
