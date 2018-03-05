@@ -36,7 +36,7 @@ from contextlib import contextmanager, redirect_stdout
 from threading import Thread
 
 try:
-    from hunter import trace, CallPrinter
+    from hunter import trace
 except ImportError:
     print('IMPORT_ERROR: hunter not installed.', file=sys.stderr)
     exit(1)
@@ -53,7 +53,7 @@ except ImportError:
 #
 # NOTE: See https://regex101.com/r/sf6nAH/15 for more info
 WOLF_MACROS = re.compile(
-    r"^(?!pass\s+|return\s+|continue\s+|if\s+|for\s+)((?P<variable>\w+)$|^(print\((?P<print>.+)\))|^(?P<macro_source>(?P<local>[^\d\W]+\s)*((?P<assignment>\=)?(?P<operator>\+\=|\-\=|\*\=|\\\=)* *)*(?P<macro>[^#\s].+)\#\s?\?[^\n]*))")
+    r"^(?!pass\s+|from\s+|import\s+|return\s+|continue\s+|if\s+|for\s+)((?P<variable>\w+)$|^(print\((?P<print>.+)\))|^(?P<macro_source>(?P<local>[^\d\W]+\s)*((?P<assignment>\=)?(?P<operator>\+\=|\-\=|\*\=|\\\=)* *)*(?P<macro>[^#\s].+)\#\s?\?[^\n]*))")
 
 # XXX: For parsing hunter.CodePrinter output see:
 # https://regex101.com/r/sf6nAH/2
@@ -237,8 +237,8 @@ def resultifier(value):
 def wolf_prints():
     # It's important that we create an output that can be handled
     # by the javascript `JSON.parse(...)` function.
-    results = [json.dumps(i) for i in WOLF if contains_any(
-        'value', 'std_out', i.keys()) or i['error']]
+    results = (json.dumps(i) for i in WOLF if contains_any(
+        'value', i.keys()) or i['error'])
     python_data = ", ".join(results)
 
     # DO NOT TOUCH, ie: no pretty printing
@@ -256,14 +256,10 @@ def parse_eval(*args, **kw):
         if event['kind'] == 'line':
             value = traceback.format_exception_only(type(e), e)[0]
             metadata = {
-                "line_number":         event['lineno'],
-                "counter":                     COUNTER,
+                "lineno":              event['lineno'],
                 "source":      event['source'].strip(),
-                "kind":                  event['kind'],
                 "value":                         value,
-                "pretty":                        value,
                 "error":                          True,
-                "calls":                event['calls'],
             }
 
             WOLF.append(metadata)
@@ -283,7 +279,6 @@ def result_handler(event):
 
     # XXX: WARNING, SIDE EFFECTS MAY INCLUDE:
     global WOLF
-    global COUNTER
 
     # NOTE: Consider refactoring this using
     #      class variables instead of globals.
@@ -297,13 +292,9 @@ def result_handler(event):
     # the metadata returned to the extension in the
     # WOLF list.
     metadata = {
-        "line_number":        event['lineno'],
-        "kind":                 event['kind'],
+        "lineno":             event['lineno'],
         "source":     event['source'].strip(),
-        "counter":                    COUNTER,
-        "error":                        False,
         # "value"    <-  Defined below MAYBE..
-        # "pretty"                  <-  SAME..
     }
 
     # The annotation will take on this value
@@ -322,6 +313,7 @@ def result_handler(event):
     # # how it works.
     match = WOLF_MACROS.search(source)
 
+    skip = False
     # Regex match groups are used for convenience.
     if match:
 
@@ -332,17 +324,12 @@ def result_handler(event):
 
         # A little magic to parse print args
         if match.group('print'):
-            buf = io.StringIO()
-            to_print = parse_eval(match.group('print'),
-                                  _globals, _locals, event=event)
-            if isinstance(to_print, list) or isinstance(to_print, tuple):
-                # Handle unpacking iterables
-                print(*to_print, file=buf)
-            else:
-                # Plain ol' value
-                print(to_print, file=buf)
-            value = str(buf.getvalue())
-            buf.close()
+            buffer = io.StringIO()
+            to_eval = "print({}, file=wolf__buffer__)".format(
+                match.group('print'))
+            exec(to_eval, _globals, {**_locals, 'wolf__buffer__': buffer})
+            value = str(buffer.getvalue()).strip('\n')
+            buffer.close()
 
         # Macros require a few more steps..
         if match.group('macro'):
@@ -360,8 +347,13 @@ def result_handler(event):
                 # Get the variable name
                 local_name = match.group('local').strip()
 
+                if match.group('operator') or match.group('assignment'):
+                    if event.function == '<listcomp>':
+                        skip = True
+
                 # This is for += -= *= and /= assignments
                 if match.group('operator'):
+
                     # This get the value of the local variable from earlier
                     left_side_value = parse_eval(local_name,
                                                  m_globals_copy, m_locals_copy, event=event)
@@ -378,11 +370,10 @@ def result_handler(event):
 
         # Final results are formatted
         metadata['value'] = resultifier(value)
-        metadata['pretty'] = pformat(value, indent=4, width=60)
 
-    # And lastly, update our WOLF results list
-    WOLF.append(metadata)
-    COUNTER += 1
+        if not skip:
+            # And lastly, update our WOLF results list
+            WOLF.append(metadata)
 
 
 def filename_filter(filename):
@@ -514,12 +505,9 @@ def main(filename):
             lineno = tb[1]
         source = get_line_from_file(full_path, tb[1])
         metadata = {
-            "line_number":     lineno,
-            "kind":            'line',
-            "counter":        COUNTER,
+            "lineno":          lineno,
             "source":  source.strip(),
             "value":            value,
-            "pretty":           value,
             "error":             True,
         }
         # And tack the error on to the end of the response.
@@ -528,11 +516,12 @@ def main(filename):
     else:
         # Otherwise clip the final return code/message from the stack
         # so it doesn't hide the last decoration.
-        WOLF.pop()
+        if WOLF:
+            WOLF.pop()
 
     if WOLF:
         # For testing purposes
-        # logout(WOLF, p=True)
+        # logerr(WOLF)
 
         # We must have some data ready for the client, let's print
         # the results and return a 0 for the exit code
