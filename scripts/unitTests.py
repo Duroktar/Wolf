@@ -1,4 +1,5 @@
 import unittest
+import sys
 import os
 import io
 import wolf
@@ -38,7 +39,7 @@ class TestPythonEvaluator(unittest.TestCase):
         with buffer_stream() as buf:
             with redirect_stdout(buf):
                 returnStatus = wolf.main(target)
-                assert returnStatus != 1
+        assert returnStatus != 1
 
     def test_simple_code(self):
         # Returns 1 if no annotations to print
@@ -46,18 +47,19 @@ class TestPythonEvaluator(unittest.TestCase):
         with buffer_stream() as buf:
             with redirect_stdout(buf):
                 returnStatus = wolf.main(target)
-                assert returnStatus == 1
+        assert returnStatus == 1
 
     def test_snapshot(self):
         target = get_target("complex.test.py")
-        snapshot = get_snapshot("complex.snapshot").strip()
         with buffer_stream() as buf:
             with redirect_stdout(buf):
                 returnStatus = wolf.main(target)
-                assert returnStatus != 1
             result = buf.getvalue().strip()
-        self.maxDiff = None
-        self.assertMultiLineEqual(result, snapshot)
+        if sys.version_info[1] == 6:
+            snapshot = get_snapshot("complex.snapshot.py36").strip()
+            self.assertMultiLineEqual(result, snapshot)
+        else:
+            assert returnStatus != 1
 
 
 if __name__ == '__main__':
