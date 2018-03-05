@@ -30,12 +30,12 @@ export class PythonTracer {
       if (data.includes("IMPORT_ERROR")) {
         installHunter(afterInstall);
       } else {
-        onError(data + "");
+        onError(data.toString());
       }
     });
 
     python.stdout.on("data", (data: Buffer): void => {
-      const wolfResults = this.tryParsePythonData(data);
+      const wolfResults: WolfParsedTraceResults = this.tryParsePythonData(data);
       if (wolfResults) {
         onData(wolfResults);
       }
@@ -43,12 +43,15 @@ export class PythonTracer {
   }
 
   private tryParsePythonData(jsonish: Buffer): WolfParsedTraceResults {
-    const index = indexOrLast(jsonish + "", "WOOF:");
+    // move to api
+    const asString: string = jsonish.toString();
+    const index: number = indexOrLast(asString, "WOOF:");
     if (index !== -1) {
       try {
-        return JSON.parse(new String(jsonish).slice(index));
+        return JSON.parse(asString.slice(index));
       } catch (err) {
         console.error("Error parsing Wolf output. ->");
+        console.error(asString);
         console.error(err);
       }
     } else {
