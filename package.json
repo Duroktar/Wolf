@@ -132,5 +132,8 @@
     "typescript": "^2.7.2",
     "vsce": "^1.37.1",
     "vscode": "^1.1.10"
+  },
+  "dependencies": {
+    "js-beautify": "^1.7.5"
   }
 }
