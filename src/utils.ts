@@ -27,7 +27,7 @@ export function formatWolfResponseElement(
 ): WolfValue {
   const hasValue = element.hasOwnProperty("value");
 
-  if ((hasValue && element.kind === "line") || element.error) {
+  if (hasValue || element.error) {
     if (Array.isArray(element.value)) {
       return "[" + element.value.join(", ") + "]";
     }

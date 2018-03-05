@@ -32,7 +32,7 @@ export interface WolfLineDecoration {
   error: boolean;
   loop: boolean;
   source: string;
-  pretty: string[];
+  pretty: WolfValue[];
   calls: number;
 }
 
@@ -59,7 +59,7 @@ export interface WolfSessionDecorations {
 }
 
 export interface WolfTraceLineResult {
-  line_number: number;
+  lineno: number;
   value: WolfValue;
   kind: string;
   source: string;
@@ -74,7 +74,7 @@ export type WolfParsedTraceResults = WolfTraceLineResult[] | null;
 export interface WolfTracerInterface {
   rootDir: string;
   afterInstall: () => void;
-  onData: (string) => void;
+  onData: (WolfParsedTraceResults) => void;
   onError: (string) => void;
 }
 
