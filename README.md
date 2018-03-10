@@ -100,9 +100,7 @@ This extension contributes the following settings:
 * `wolf.barkAtCurrentFile`: Starts Wolf on the current file.
 * `wolf.stopBarking`: Stops all running Wolf sessions.
 * `wolf.pawPrintsInGutter`: Use paw prints for gutter icons.
-* `wolf.hot`: For enabling live re-loading.
-* `wolf.disableHotModeWarning`: For enabling live re-loading.
-* `wolf.hotFrequency`: Adjust the minimum timeframe before the file is saved during Hot Mode
+* `wolf.updateFrequency`: Adjust the minimum timeframe before the file is saved during Hot Mode
 
 ## FAQ
 
@@ -156,6 +154,31 @@ You can't get any better than _live feedback next to the code you're editing_!
 ---
 
 ## **Changelog**
+
+## v0.3.0 ~ Minor Release
+
+### Way Improved Hot Reloading
+
+The working file does not auto save on changes anymore :tada:
+This makes the editing experience smoother and more natural.
+
+### No Config Setup
+
+Wolf works in what was once called "Hot Mode" by default now. This means
+your live editing experience will be tuned for performance out
+of the box, with updating annotations on the fly.
+
+> NOTE: With these changes the following config options have been removed
+> or changed:
+
+> Removed Options:
+
+* `wolf.hot`: For enabling live re-loading. (Always on now)
+* `wolf.disableHotModeWarning`: Disabled the hot mode warning.
+
+> Changed Options:
+
+* `wolf.hotFrequency` -> `wolf.updateFrequency`
 
 ## v0.2.0 ~ Minor Release
 
