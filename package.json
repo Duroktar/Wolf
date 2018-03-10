@@ -2,7 +2,7 @@
   "name": "wolf",
   "displayName": "Wolf",
   "description": "Python live scratchpad",
-  "version": "0.2.5",
+  "version": "0.3.0",
   "publisher": "traBpUkciP",
   "license": "Apache-2.0",
   "engines": {
@@ -25,23 +25,11 @@
           "description":
             "Use Paw Print style icons in the gutters. (Requires restart)"
         },
-        "wolf.hot": {
-          "type": "boolean",
-          "default": true,
-          "description":
-            "Updates the file on throttled text input. Makes Wolf feel more \"live\""
-        },
-        "wolf.hotFrequency": {
+        "wolf.updateFrequency": {
           "type": "number",
           "default": 320,
           "description":
             "Updates the file on throttled text input. Makes Wolf feel more \"live\""
-        },
-        "wolf.disableHotModeWarning": {
-          "type": "boolean",
-          "default": false,
-          "description":
-            "Disables the warning upon entering a wolf session in Hot Mode."
         }
       }
     },
@@ -134,6 +122,7 @@
     "vscode": "^1.1.10"
   },
   "dependencies": {
-    "js-beautify": "^1.7.5"
+    "js-beautify": "^1.7.5",
+    "tmp": "0.0.33"
   }
 }
