@@ -30,8 +30,13 @@ export function activate(context: ExtensionContext) {
   }
 
   function startWolf(): void {
-    wolfAPI.stepInWolf();
-    throttledHandleDidSaveTextDocument();
+    if (wolfAPI.activeEditorIsDirty) {
+      const message = "Please save the document before running Wolf.";
+      vscode.window.showInformationMessage(message);
+    } else {
+      wolfAPI.stepInWolf();
+      throttledHandleDidSaveTextDocument();
+    }
   }
 
   function stopWolf(): void {
