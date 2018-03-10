@@ -1,3 +1,4 @@
+import * as fs from "fs";
 import {
   WolfDecorationsController,
   wolfDecorationStoreFactory
@@ -20,7 +21,7 @@ import {
 import { WolfSessionController, wolfSessionStoreFactory } from "./sessions";
 import { WolfStickyController, wolfStickyControllerFactory } from "./sticky";
 import { PythonTracer, pythonTracerFactory } from "./tracer";
-import { getActiveEditor } from "./utils";
+import { getActiveEditor, makeTempFile } from "./utils";
 
 export function wolfStandardApiFactory(context: ExtensionContext) {
   const wolfDecorationStore = wolfDecorationStoreFactory(context);
@@ -108,7 +109,20 @@ export class WolfAPI {
   public handleDidChangeTextDocument = (
     event: TextDocumentChangeEvent
   ): void => {
-    this.updateStickys(event);
+    const tempFileObj = makeTempFile(event.document.fileName);
+    const newSource = event.document.getText();
+    this.decorations.reInitDecorationCollection();
+    fs.writeFileSync(tempFileObj.name, newSource);
+    this.tracer.tracePythonScriptForDocument({
+      fileName: tempFileObj.name,
+      rootDir: this.rootExtensionDir,
+      afterInstall: this.traceOrRenderPreparedDecorations, // Recurse if Hunter had to be installed first,
+      onData: data => {
+        this.onPythonDataSuccess(data);
+        tempFileObj.removeCallback();
+      },
+      onError: this.onPythonDataError
+    } as WolfTracerInterface);
   };
 
   public handleDidSaveTextDocument = (trace: boolean): void => {
@@ -151,12 +165,12 @@ export class WolfAPI {
     this.decorations.prepareParsedPythonData(data);
   };
 
-  public renderPreparedDecorationsForActiveSession = (): void => {
+  private renderPreparedDecorationsForActiveSession = (): void => {
     this.renderPreparedDecorationsForSession(this.activeEditor);
   };
 
-  public renderPreparedDecorationsForSession = (session: TextEditor): void => {
-    this.clearDecorationsForSession(session);
+  private renderPreparedDecorationsForSession = (session: TextEditor): void => {
+    this.decorations.reInitDecorationCollection();
     this.decorations.setPreparedDecorationsForEditor(session);
     this.setPreparedDecorationsForSession(session);
   };
@@ -174,24 +188,24 @@ export class WolfAPI {
     session.setDecorations(decorationTypes.error, decorations.error);
   };
 
-  public setPreparedDecorationsForActiveSession = (): void => {
-    this.setPreparedDecorationsForSession(this.activeEditor);
-  };
-
-  public setPreparedDecorationsForSession = (session: TextEditor): void => {
+  private setPreparedDecorationsForSession = (session: TextEditor): void => {
     const decorations = this.decorations.getPreparedDecorations();
     this.setDecorationsForSession(session, decorations);
   };
 
-  public traceOrRenderPreparedDecorations = (trace: boolean): void => {
+  private traceAndRenderDecorationsForActiveSession = (): void => {
+    this.decorations.reInitDecorationCollection();
+    this.tracer.tracePythonScriptForActiveEditor({
+      rootDir: this.rootExtensionDir,
+      afterInstall: this.traceOrRenderPreparedDecorations, // Recurse if Hunter had to be installed first,
+      onData: this.onPythonDataSuccess,
+      onError: this.onPythonDataError
+    } as WolfTracerInterface);
+  };
+
+  private traceOrRenderPreparedDecorations = (trace: boolean): void => {
     if (trace) {
-      this.decorations.reInitDecorationCollection();
-      this.tracer.tracePythonScript({
-        rootDir: this.rootExtensionDir,
-        afterInstall: this.traceOrRenderPreparedDecorations, // Recurse if Hunter had to be installed first,
-        onData: this.onPythonDataSuccess,
-        onError: this.onPythonDataError
-      } as WolfTracerInterface);
+      this.traceAndRenderDecorationsForActiveSession();
     } else {
       this.renderPreparedDecorationsForActiveSession();
     }
@@ -242,8 +256,8 @@ export class WolfAPI {
     return this.config.get("hot");
   }
 
-  public get hotFrequency() {
-    return parseInt(this.config.get("hotFrequency"));
+  public get updateFrequency() {
+    return parseInt(this.config.get("updateFrequency"));
   }
 
   public get oldLineCount() {
