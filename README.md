@@ -157,11 +157,6 @@ You can't get any better than _live feedback next to the code you're editing_!
 
 ## v0.3.0 ~ Minor Release
 
-### Way Improved Hot Reloading
-
-The working file does not auto save on changes anymore :tada:
-This makes the editing experience smoother and more natural.
-
 ### No Config Setup
 
 Wolf works in what was once called "Hot Mode" by default now. This means
@@ -174,7 +169,6 @@ of the box, with updating annotations on the fly.
 > Removed Options:
 
 * `wolf.hot`: For enabling live re-loading. (Always on now)
-* `wolf.disableHotModeWarning`: Disabled the hot mode warning.
 
 > Changed Options:
 
