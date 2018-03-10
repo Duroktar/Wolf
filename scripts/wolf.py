@@ -53,7 +53,7 @@ except ImportError:
 #
 # NOTE: See https://regex101.com/r/sf6nAH/15 for more info
 WOLF_MACROS = re.compile(
-    r"^(?!pass\s+|from\s+|import\s+|return\s+|continue\s+|if\s+|for\s+)((?P<variable>\w+)$|^(print\((?P<print>.+)\))|^(?P<macro_source>(?P<local>[^\d\W]+\s)*((?P<assignment>\=)?(?P<operator>\+\=|\-\=|\*\=|\\\=)* *)*(?P<macro>[^#\s].+)\#\s?\?[^\n]*))")
+    r"^(?!pass\s+|from\s+|import\s+|return\s+|continue\s+|if\s+|for\s+)((?P<variable>\w+)$|^(print\((?P<print>.+)\))|^(?P<macro_source>(?P<local>[^\d\W]+\s)*((?P<assignment>\=)?(?P<operator>\+\=|\-\=|\*\=|\\\=)* *)*(?P<macro>[\w\{\[\(].+)\#\s?\?[^\n]*))")
 
 # XXX: For parsing hunter.CodePrinter output see:
 # https://regex101.com/r/sf6nAH/2
@@ -166,6 +166,17 @@ def get_line_from_file(_file, lineno):
         return lines[lineno - 1]
     else:
         return ""
+
+
+def try_deepcopy(obj):
+    """ 
+        Deepcopy can throw a type error when sys modules are to be
+        included in the object being copied..
+    """
+    try:
+        return deepcopy(obj)
+    except TypeError:
+        return obj
 
 
 ###################
@@ -319,26 +330,32 @@ def result_handler(event):
 
         # Simplest case.
         if match.group('variable'):
-            value = parse_eval(match.group('variable'),
-                               _globals, _locals, event=event)
+            if event.kind != 'call':
+                value = parse_eval(match.group('variable'),
+                                   _globals, _locals, event=event)
+                metadata["source"] = event['source'],
+            else:
+                skip = True
 
         # A little magic to parse print args
         if match.group('print'):
             buffer = io.StringIO()
-            to_eval = "print({}, file=wolf__buffer__)".format(
-                match.group('print'))
-            exec(to_eval, _globals, {**_locals, 'wolf__buffer__': buffer})
-            value = str(buffer.getvalue()).strip('\n')
-            buffer.close()
+            try:
+                to_eval = "print({}, file=wolf__buffer__)".format(
+                    match.group('print'))
+                exec(to_eval, _globals, {**_locals, 'wolf__buffer__': buffer})
+                value = str(buffer.getvalue()).strip('\n')
+            finally:
+                buffer.close()
 
         # Macros require a few more steps..
         if match.group('macro'):
 
             # XXX: This is to help avoid side effects when evaluating expressions
-            m_locals_copy = deepcopy(_locals)
-            m_globals_copy = deepcopy(_globals)
+            m_locals_copy = {k: try_deepcopy(v) for k, v in _locals.items()}
+            m_globals_copy = {k: try_deepcopy(v) for k, v in _globals.items()}
 
-            # The expression to be evaluated
+            # Basic macro to evaluate
             value = parse_eval(match.group('macro').strip(),
                                m_globals_copy, m_locals_copy, event=event)
 
@@ -400,8 +417,8 @@ def import_and_trace_script(module_name, module_path):
 
         NOTE: script_path is necessary here for relative imports to work
     """
-    with script_path(os.path.abspath(os.path.dirname(module_path))):
-        with trace(filename_filter(module_path), action=result_handler):
+    with trace(filename_filter(module_path), action=result_handler):
+        with script_path(os.path.abspath(os.path.dirname(module_path))):
             import_file(module_name, module_path)
 
 
@@ -410,8 +427,8 @@ def debug_import_and_trace_script(module_name, module_path):
         XXX: For testing purposes.. This bypasses the timeout which would
         otherwise stop the debugging sessions when the timeout expires.
     """
-    with script_path(os.path.abspath(os.path.dirname(module_path))):
-        with trace(filename_filter(module_path), action=result_handler):
+    with trace(filename_filter(module_path), action=result_handler):
+        with script_path(os.path.abspath(os.path.dirname(module_path))):
             import_file(module_name, module_path)
 
 
