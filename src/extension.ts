@@ -1,6 +1,5 @@
 import * as vscode from "vscode";
 import {
-  Disposable,
   ExtensionContext,
   TextDocument,
   TextDocumentChangeEvent
@@ -9,81 +8,48 @@ import {
 import { wolfStandardApiFactory, WolfAPI } from "./api";
 import { hotModeWarning } from "./hotWarning";
 import { ActiveTextEditorChangeEventResult } from "./types";
-import { clamp } from "./utils";
+import { clamp, registerCommand } from "./utils";
 
 export function activate(context: ExtensionContext) {
   const wolfAPI: WolfAPI = wolfStandardApiFactory(context);
 
-  function startWolf() {
+  initializeWolfExtension();
+
+  function initializeWolfExtension(): void {
+    context.subscriptions.push(
+      registerCommand("wolf.touchBarStart", startWolf),
+      registerCommand("wolf.touchBarStop", stopWolf),
+      registerCommand("wolf.barkAtCurrentFile", startWolf),
+      registerCommand("wolf.stopBarking", stopWolf)
+    );
+
+    const opts = [null, context.subscriptions];
+    vscode.window.onDidChangeActiveTextEditor(changedActiveTextEditor, ...opts);
+    vscode.workspace.onDidChangeTextDocument(changedTextDocument, ...opts);
+    vscode.workspace.onDidSaveTextDocument(savedTextDocument, ...opts);
+    vscode.workspace.onDidChangeConfiguration(changedConfiguration, ...opts);
+  }
+
+  function startWolf(): void {
     const _init = () => {
       wolfAPI.stepInWolf();
       wolfAPI.enterWolfContext();
       throttledHandleDidSaveTextDocument();
     };
     if (wolfAPI.isHot && !wolfAPI.hotModeWarningDisabled) {
-      return hotModeWarning(_init);
+      hotModeWarning(_init);
+    } else {
+      _init();
     }
-    _init();
   }
 
-  function stopWolf() {
+  function stopWolf(): void {
     wolfAPI.stopWolf();
     wolfAPI.exitWolfContext();
     cancelPending();
   }
 
-  const wolfStartCommand: Disposable = vscode.commands.registerCommand(
-    "wolf.barkAtCurrentFile",
-    startWolf
-  );
-
-  const wolfStartAction: Disposable = vscode.commands.registerCommand(
-    "wolf.touchBarStart",
-    startWolf
-  );
-
-  const wolfStopCommand: Disposable = vscode.commands.registerCommand(
-    "wolf.stopBarking",
-    stopWolf
-  );
-
-  const wolfStopAction: Disposable = vscode.commands.registerCommand(
-    "wolf.touchBarStop",
-    stopWolf
-  );
-
-  context.subscriptions.push(
-    wolfStartAction,
-    wolfStartCommand,
-    wolfStopAction,
-    wolfStopCommand
-  );
-
-  vscode.window.onDidChangeActiveTextEditor(
-    handleDidChangeActiveTextEditor,
-    null,
-    context.subscriptions
-  );
-
-  vscode.workspace.onDidChangeTextDocument(
-    handleDidChangeTextDocument,
-    null,
-    context.subscriptions
-  );
-
-  vscode.workspace.onDidSaveTextDocument(
-    handleDidSaveTextDocument,
-    null,
-    context.subscriptions
-  );
-
-  vscode.workspace.onDidChangeConfiguration(
-    handleDidChangeConfiguration,
-    null,
-    context.subscriptions
-  );
-
-  function handleDidChangeActiveTextEditor(
+  function changedActiveTextEditor(
     editor: ActiveTextEditorChangeEventResult
   ): void {
     if (editor) {
@@ -105,27 +71,23 @@ export function activate(context: ExtensionContext) {
     }
   }
 
-  function handleDidChangeTextDocument(event: TextDocumentChangeEvent): void {
+  function changedTextDocument(event: TextDocumentChangeEvent): void {
     if (wolfAPI.isDocumentWolfSession(event.document)) {
       throttledHandleDidChangeTextDocument(event);
-      if (wolfAPI.isHot) {
-        wolfAPI.activeEditor.document.save();
-      }
     }
   }
 
-  function handleDidSaveTextDocument(document: TextDocument): void {
+  function savedTextDocument(document: TextDocument): void {
     if (wolfAPI.isDocumentWolfSession(document)) {
       wolfAPI.updateLineCount(document.lineCount);
       throttledHandleDidSaveTextDocument(true);
     }
   }
 
-  function handleDidChangeConfiguration(event) {
+  function changedConfiguration(event): void {
     if (
-      event.affectsConfiguration("wolf.hot") ||
       event.affectsConfiguration("wolf.pawPrintsInGutter") ||
-      event.affectsConfiguration("wolf.hotFrequency")
+      event.affectsConfiguration("wolf.updateFrequency")
     ) {
       wolfAPI.setConfigUpdatedFlag(true);
     }
@@ -146,7 +108,7 @@ export function activate(context: ExtensionContext) {
     }
     updateTimeout = setTimeout(
       () => wolfAPI.handleDidSaveTextDocument(trace),
-      wolfAPI.isHot ? clamp(100, 10000, wolfAPI.hotFrequency) : 500
+      wolfAPI.isHot ? clamp(100, 10000, wolfAPI.updateFrequency) : 500
     );
   }
 
