@@ -48,8 +48,8 @@ export function activate(context: ExtensionContext) {
     editor: ActiveTextEditorChangeEventResult
   ): void {
     if (editor) {
-      wolfAPI.updateLineCount(editor.document.lineCount);
       if (wolfAPI.sessions.sessionIsActiveByDocument(editor.document)) {
+        wolfAPI.updateLineCount(editor.document.lineCount);
         if (wolfAPI.configChanged) {
           vscode.window.showInformationMessage(
             "Wolf detected a change to its configuration and was shut off. Please start Wolf again to continue."
@@ -57,8 +57,10 @@ export function activate(context: ExtensionContext) {
           wolfAPI.setConfigUpdatedFlag(false);
           stopWolf();
         } else {
-          throttledHandleDidSaveTextDocument(false);
           wolfAPI.enterWolfContext();
+          throttledHandleDidChangeTextDocument({
+            document: editor.document
+          } as TextDocumentChangeEvent);
         }
       } else {
         wolfAPI.exitWolfContext();

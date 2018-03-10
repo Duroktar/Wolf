@@ -50,6 +50,7 @@ export class WolfAPI {
     this.decorations.setDefaultDecorationOptions("green", "red");
     this.sessions.createSessionFromEditor(this.activeEditor);
     this.updateLineCount(this.activeEditor.document.lineCount);
+    this.traceOrRenderPreparedDecorations(true);
     this.enterWolfContext();
   };
 
@@ -113,6 +114,7 @@ export class WolfAPI {
   ): void => {
     const tempFileObj = makeTempFile(event.document.fileName);
     const newSource = event.document.getText();
+    this.clearDecorationsForActiveSession();
     this.decorations.reInitDecorationCollection();
     fs.writeFileSync(tempFileObj.name, newSource);
     this.tracer.tracePythonScriptForDocument({
@@ -123,13 +125,14 @@ export class WolfAPI {
         this.onPythonDataSuccess(data);
         tempFileObj.removeCallback();
       },
-      onError: this.onPythonDataError
+      onError: data => {
+        this.onPythonDataError(data);
+        tempFileObj.removeCallback();
+      }
     } as WolfTracerInterface);
   };
 
-  public handleDidSaveTextDocument = (trace: boolean): void => {
-    this.traceOrRenderPreparedDecorations(trace);
-  };
+  public handleDidSaveTextDocument = (trace: boolean): void => {};
 
   public isDocumentWolfSession = (document: TextDocument): boolean => {
     return this.sessions.sessionIsActiveByDocument(document);
@@ -172,7 +175,6 @@ export class WolfAPI {
   };
 
   private renderPreparedDecorationsForSession = (session: TextEditor): void => {
-    this.decorations.reInitDecorationCollection();
     this.decorations.setPreparedDecorationsForEditor(session);
     this.setPreparedDecorationsForSession(session);
   };
