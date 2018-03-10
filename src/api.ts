@@ -50,10 +50,12 @@ export class WolfAPI {
     this.decorations.setDefaultDecorationOptions("green", "red");
     this.sessions.createSessionFromEditor(this.activeEditor);
     this.updateLineCount(this.activeEditor.document.lineCount);
+    this.enterWolfContext();
   };
 
   public stopWolf = (): void => {
     this.clearAllSessionsAndDecorations();
+    this.exitWolfContext();
   };
 
   public enterWolfContext = (): void => {
