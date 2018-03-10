@@ -22,6 +22,7 @@ import { WolfSessionController, wolfSessionStoreFactory } from "./sessions";
 import { WolfStickyController, wolfStickyControllerFactory } from "./sticky";
 import { PythonTracer, pythonTracerFactory } from "./tracer";
 import { getActiveEditor, makeTempFile } from "./utils";
+import { hotModeWarning } from "./hotWarning";
 
 export function wolfStandardApiFactory(context: ExtensionContext) {
   const wolfDecorationStore = wolfDecorationStoreFactory(context);
@@ -132,8 +133,6 @@ export class WolfAPI {
     } as WolfTracerInterface);
   };
 
-  public handleDidSaveTextDocument = (trace: boolean): void => {};
-
   public isDocumentWolfSession = (document: TextDocument): boolean => {
     return this.sessions.sessionIsActiveByDocument(document);
   };
@@ -197,6 +196,10 @@ export class WolfAPI {
     this.setDecorationsForSession(session, decorations);
   };
 
+  public displayHotModeWarning(): void {
+    hotModeWarning();
+  }
+
   private traceAndRenderDecorationsForActiveSession = (): void => {
     this.decorations.reInitDecorationCollection();
     this.tracer.tracePythonScriptForActiveEditor({
@@ -252,10 +255,6 @@ export class WolfAPI {
     return this._decorationController;
   }
 
-  public get hotModeWarningDisabled() {
-    return this.config.get("disableHotModeWarning");
-  }
-
   public get isHot() {
     return this.config.get("hot");
   }
@@ -282,6 +281,10 @@ export class WolfAPI {
 
   public get sessions() {
     return this._sessionController;
+  }
+
+  public get shouldShowHotModeWarning() {
+    return this.config.get("disableHotModeWarning") !== true;
   }
 
   public get stickys() {
