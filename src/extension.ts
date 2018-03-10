@@ -6,7 +6,6 @@ import {
 } from "vscode";
 
 import { wolfStandardApiFactory, WolfAPI } from "./api";
-import { hotModeWarning } from "./hotWarning";
 import { ActiveTextEditorChangeEventResult } from "./types";
 import { clamp, registerCommand } from "./utils";
 
@@ -31,21 +30,12 @@ export function activate(context: ExtensionContext) {
   }
 
   function startWolf(): void {
-    const _init = () => {
-      wolfAPI.stepInWolf();
-      wolfAPI.enterWolfContext();
-      throttledHandleDidSaveTextDocument();
-    };
-    if (wolfAPI.isHot && !wolfAPI.hotModeWarningDisabled) {
-      hotModeWarning(_init);
-    } else {
-      _init();
-    }
+    wolfAPI.stepInWolf();
+    throttledHandleDidSaveTextDocument();
   }
 
   function stopWolf(): void {
     wolfAPI.stopWolf();
-    wolfAPI.exitWolfContext();
     cancelPending();
   }
 
