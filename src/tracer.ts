@@ -43,7 +43,7 @@ export class PythonTracer {
 
     python.stderr.on("data", (data: Buffer) => {
       if (data.includes("IMPORT_ERROR")) {
-        installHunter(afterInstall);
+        onError(installHunter(afterInstall));
       } else {
         onError(data.toString());
       }
@@ -51,9 +51,7 @@ export class PythonTracer {
 
     python.stdout.on("data", (data: Buffer): void => {
       const wolfResults: WolfParsedTraceResults = this.tryParsePythonData(data);
-      if (wolfResults) {
-        onData(wolfResults);
-      }
+      onData(wolfResults || ([] as WolfParsedTraceResults));
     });
   }
 
