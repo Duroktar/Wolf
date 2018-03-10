@@ -56,6 +56,7 @@ export class WolfAPI {
   };
 
   public stopWolf = (): void => {
+    this.decorations.reInitDecorationCollection();
     this.clearAllSessionsAndDecorations();
     this.exitWolfContext();
   };
@@ -123,12 +124,12 @@ export class WolfAPI {
       rootDir: this.rootExtensionDir,
       afterInstall: this.traceOrRenderPreparedDecorations, // Recurse if Hunter had to be installed first,
       onData: data => {
-        this.onPythonDataSuccess(data);
         tempFileObj.removeCallback();
+        this.onPythonDataSuccess(data);
       },
       onError: data => {
-        this.onPythonDataError(data);
         tempFileObj.removeCallback();
+        this.onPythonDataError(data);
       }
     } as WolfTracerInterface);
   };
