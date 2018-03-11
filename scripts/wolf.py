@@ -241,7 +241,6 @@ def result_handler(event):
     metadata = {
         "lineno":             event['lineno'],
         "source":     event['source'].strip(),
-        "kind":                 event['kind'],
         # "value"    <-  Defined below MAYBE..
     }
 
@@ -327,7 +326,7 @@ def result_handler(event):
         # Final results are formatted
         metadata['value'] = resultifier(value)
 
-        if not skip:
+        if not skip and event.kind != 'return':
             # And lastly, update our WOLF results list
             WOLF.append(metadata)
 
@@ -434,16 +433,21 @@ def main(filename):
         # send back data that can be used to decorate
         # the offending line.
 
-        # TODO: This is a gd mess. I need to sort this out, bad..
-        _, _, exc_traceback = sys.exc_info()
         value = traceback.format_exception_only(type(e), e)[0]
-        tb = traceback.extract_tb(exc_traceback)[-1]
+
         if isinstance(e, SyntaxError):
             lineno = getattr(e, 'lineno')
             value = e.msg
+            source = e.line
         else:
-            lineno = tb[1]
-        source = get_line_from_file(full_path, tb[1])
+            _, _, exc_traceback = sys.exc_info()
+            tb = traceback.extract_tb(exc_traceback)[-1]
+            for i in traceback.extract_tb(exc_traceback):
+                if i.filename == filename:
+                    tb = i
+            lineno = tb.lineno
+            source = tb.line
+
         metadata = {
             "lineno":          lineno,
             "source":  source.strip(),
@@ -453,13 +457,6 @@ def main(filename):
 
         # And tack the error on to the end of the response.
         WOLF.append(metadata)
-
-    if len(WOLF) > 1:
-        # This prevents the return value of the script from
-        # being assigned to the last annotation, causing a
-        # duplicate decoration to appear.
-        if WOLF[-1]['kind'] == 'return':
-            WOLF.pop()
 
     # print the results and return a 0 for the exit code
     wolf_prints()
