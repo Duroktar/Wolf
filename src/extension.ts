@@ -1,103 +1,63 @@
 import * as vscode from "vscode";
-import {
-  Disposable,
-  ExtensionContext,
-  TextDocument,
-  TextDocumentChangeEvent
-} from "vscode";
+import { ExtensionContext, TextDocumentChangeEvent } from "vscode";
 
 import { wolfStandardApiFactory, WolfAPI } from "./api";
-import { hotModeWarning } from "./hotWarning";
 import { ActiveTextEditorChangeEventResult } from "./types";
-import { clamp } from "./utils";
+import { clamp, registerCommand } from "./utils";
 
 export function activate(context: ExtensionContext) {
   const wolfAPI: WolfAPI = wolfStandardApiFactory(context);
 
-  function startWolf() {
-    const _init = () => {
-      wolfAPI.stepInWolf();
-      wolfAPI.enterWolfContext();
-      throttledHandleDidSaveTextDocument();
-    };
-    if (wolfAPI.isHot && !wolfAPI.hotModeWarningDisabled) {
-      return hotModeWarning(_init);
-    }
-    _init();
+  initializeWolfExtension();
+
+  function initializeWolfExtension(): void {
+    context.subscriptions.push(
+      registerCommand("wolf.touchBarStart", startWolf),
+      registerCommand("wolf.touchBarStop", stopWolf),
+      registerCommand("wolf.barkAtCurrentFile", startWolf),
+      registerCommand("wolf.stopBarking", stopWolf)
+    );
+
+    const opts = [null, context.subscriptions];
+    vscode.window.onDidChangeActiveTextEditor(changedActiveTextEditor, ...opts);
+    vscode.workspace.onDidChangeTextDocument(changedTextDocument, ...opts);
+    vscode.workspace.onDidChangeConfiguration(changedConfiguration, ...opts);
   }
 
-  function stopWolf() {
+  function startWolf(): void {
+    if (wolfAPI.activeEditorIsDirty) {
+      const message = "Please save the document before running Wolf.";
+      vscode.window.showInformationMessage(message);
+    } else {
+      if (wolfAPI.shouldShowHotModeWarning) {
+        wolfAPI.displayHotModeWarning();
+      }
+      wolfAPI.stepInWolf();
+    }
+  }
+
+  function stopWolf(): void {
     wolfAPI.stopWolf();
-    wolfAPI.exitWolfContext();
     cancelPending();
   }
 
-  const wolfStartCommand: Disposable = vscode.commands.registerCommand(
-    "wolf.barkAtCurrentFile",
-    startWolf
-  );
-
-  const wolfStartAction: Disposable = vscode.commands.registerCommand(
-    "wolf.touchBarStart",
-    startWolf
-  );
-
-  const wolfStopCommand: Disposable = vscode.commands.registerCommand(
-    "wolf.stopBarking",
-    stopWolf
-  );
-
-  const wolfStopAction: Disposable = vscode.commands.registerCommand(
-    "wolf.touchBarStop",
-    stopWolf
-  );
-
-  context.subscriptions.push(
-    wolfStartAction,
-    wolfStartCommand,
-    wolfStopAction,
-    wolfStopCommand
-  );
-
-  vscode.window.onDidChangeActiveTextEditor(
-    handleDidChangeActiveTextEditor,
-    null,
-    context.subscriptions
-  );
-
-  vscode.workspace.onDidChangeTextDocument(
-    handleDidChangeTextDocument,
-    null,
-    context.subscriptions
-  );
-
-  vscode.workspace.onDidSaveTextDocument(
-    handleDidSaveTextDocument,
-    null,
-    context.subscriptions
-  );
-
-  vscode.workspace.onDidChangeConfiguration(
-    handleDidChangeConfiguration,
-    null,
-    context.subscriptions
-  );
-
-  function handleDidChangeActiveTextEditor(
+  function changedActiveTextEditor(
     editor: ActiveTextEditorChangeEventResult
   ): void {
     if (editor) {
-      wolfAPI.updateLineCount(editor.document.lineCount);
       if (wolfAPI.sessions.sessionIsActiveByDocument(editor.document)) {
         if (wolfAPI.configChanged) {
           vscode.window.showInformationMessage(
-            "Wolf detected a change to its configuration and was shut off. Please start Wolf again to continue."
+            "Wolf detected a change to the Hot Mode configuration and was shut off. " +
+              "Start Wolf again to continue."
           );
           wolfAPI.setConfigUpdatedFlag(false);
           stopWolf();
         } else {
-          throttledHandleDidSaveTextDocument(false);
           wolfAPI.enterWolfContext();
+          throttledHandleDidChangeTextDocument({
+            document: editor.document
+          } as TextDocumentChangeEvent);
         }
       } else {
         wolfAPI.exitWolfContext();
@@ -105,60 +65,38 @@ export function activate(context: ExtensionContext) {
     }
   }
 
-  function handleDidChangeTextDocument(event: TextDocumentChangeEvent): void {
+  function changedTextDocument(event: TextDocumentChangeEvent): void {
     if (wolfAPI.isDocumentWolfSession(event.document)) {
       throttledHandleDidChangeTextDocument(event);
-      if (wolfAPI.isHot) {
-        wolfAPI.activeEditor.document.save();
-      }
     }
   }
 
-  function handleDidSaveTextDocument(document: TextDocument): void {
-    if (wolfAPI.isDocumentWolfSession(document)) {
-      wolfAPI.updateLineCount(document.lineCount);
-      throttledHandleDidSaveTextDocument(true);
-    }
-  }
-
-  function handleDidChangeConfiguration(event) {
+  function changedConfiguration(event): void {
     if (
-      event.affectsConfiguration("wolf.hot") ||
       event.affectsConfiguration("wolf.pawPrintsInGutter") ||
-      event.affectsConfiguration("wolf.hotFrequency")
+      event.affectsConfiguration("wolf.updateFrequency")
     ) {
       wolfAPI.setConfigUpdatedFlag(true);
     }
   }
 
   let updateTimeout = null;
-  let stickyTimeout = null;
 
   function cancelPending(): void {
-    [updateTimeout, stickyTimeout].forEach(pending => {
+    [updateTimeout].forEach(pending => {
       if (pending) clearTimeout(pending);
     });
-  }
-
-  function throttledHandleDidSaveTextDocument(trace: boolean = true): void {
-    if (updateTimeout) {
-      clearTimeout(updateTimeout);
-    }
-    updateTimeout = setTimeout(
-      () => wolfAPI.handleDidSaveTextDocument(trace),
-      wolfAPI.isHot ? clamp(100, 10000, wolfAPI.hotFrequency) : 500
-    );
   }
 
   function throttledHandleDidChangeTextDocument(
     event: TextDocumentChangeEvent
   ): void {
-    if (stickyTimeout) {
-      clearTimeout(stickyTimeout);
+    if (updateTimeout) {
+      clearTimeout(updateTimeout);
     }
-    stickyTimeout = setTimeout(
+    updateTimeout = setTimeout(
       () => wolfAPI.handleDidChangeTextDocument(event),
-      450
+      clamp(100, 10000, wolfAPI.updateFrequency)
     );
   }
 }

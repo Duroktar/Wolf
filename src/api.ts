@@ -1,3 +1,4 @@
+import * as fs from "fs";
 import {
   WolfDecorationsController,
   wolfDecorationStoreFactory
@@ -20,7 +21,8 @@ import {
 import { WolfSessionController, wolfSessionStoreFactory } from "./sessions";
 import { WolfStickyController, wolfStickyControllerFactory } from "./sticky";
 import { PythonTracer, pythonTracerFactory } from "./tracer";
-import { getActiveEditor } from "./utils";
+import { getActiveEditor, makeTempFile } from "./utils";
+import { hotModeWarning } from "./hotWarning";
 
 export function wolfStandardApiFactory(context: ExtensionContext) {
   const wolfDecorationStore = wolfDecorationStoreFactory(context);
@@ -49,10 +51,14 @@ export class WolfAPI {
     this.decorations.setDefaultDecorationOptions("green", "red");
     this.sessions.createSessionFromEditor(this.activeEditor);
     this.updateLineCount(this.activeEditor.document.lineCount);
+    this.traceOrRenderPreparedDecorations(true);
+    this.enterWolfContext();
   };
 
   public stopWolf = (): void => {
+    this.decorations.reInitDecorationCollection();
     this.clearAllSessionsAndDecorations();
+    this.exitWolfContext();
   };
 
   public enterWolfContext = (): void => {
@@ -108,11 +114,24 @@ export class WolfAPI {
   public handleDidChangeTextDocument = (
     event: TextDocumentChangeEvent
   ): void => {
-    this.updateStickys(event);
-  };
-
-  public handleDidSaveTextDocument = (trace: boolean): void => {
-    this.traceOrRenderPreparedDecorations(trace);
+    const tempFileObj = makeTempFile(event.document.fileName);
+    const newSource = event.document.getText();
+    this.clearDecorationsForActiveSession();
+    this.decorations.reInitDecorationCollection();
+    fs.writeFileSync(tempFileObj.name, newSource);
+    this.tracer.tracePythonScriptForDocument({
+      fileName: tempFileObj.name,
+      rootDir: this.rootExtensionDir,
+      afterInstall: this.traceOrRenderPreparedDecorations, // Recurse if Hunter had to be installed first,
+      onData: data => {
+        tempFileObj.removeCallback();
+        this.onPythonDataSuccess(data);
+      },
+      onError: data => {
+        tempFileObj.removeCallback();
+        this.onPythonDataError(data);
+      }
+    } as WolfTracerInterface);
   };
 
   public isDocumentWolfSession = (document: TextDocument): boolean => {
@@ -151,12 +170,11 @@ export class WolfAPI {
     this.decorations.prepareParsedPythonData(data);
   };
 
-  public renderPreparedDecorationsForActiveSession = (): void => {
+  private renderPreparedDecorationsForActiveSession = (): void => {
     this.renderPreparedDecorationsForSession(this.activeEditor);
   };
 
-  public renderPreparedDecorationsForSession = (session: TextEditor): void => {
-    this.clearDecorationsForSession(session);
+  private renderPreparedDecorationsForSession = (session: TextEditor): void => {
     this.decorations.setPreparedDecorationsForEditor(session);
     this.setPreparedDecorationsForSession(session);
   };
@@ -174,24 +192,28 @@ export class WolfAPI {
     session.setDecorations(decorationTypes.error, decorations.error);
   };
 
-  public setPreparedDecorationsForActiveSession = (): void => {
-    this.setPreparedDecorationsForSession(this.activeEditor);
-  };
-
-  public setPreparedDecorationsForSession = (session: TextEditor): void => {
+  private setPreparedDecorationsForSession = (session: TextEditor): void => {
     const decorations = this.decorations.getPreparedDecorations();
     this.setDecorationsForSession(session, decorations);
   };
 
-  public traceOrRenderPreparedDecorations = (trace: boolean): void => {
+  public displayHotModeWarning(): void {
+    hotModeWarning();
+  }
+
+  private traceAndRenderDecorationsForActiveSession = (): void => {
+    this.decorations.reInitDecorationCollection();
+    this.tracer.tracePythonScriptForActiveEditor({
+      rootDir: this.rootExtensionDir,
+      afterInstall: this.traceOrRenderPreparedDecorations, // Recurse if Hunter had to be installed first,
+      onData: this.onPythonDataSuccess,
+      onError: this.onPythonDataError
+    } as WolfTracerInterface);
+  };
+
+  private traceOrRenderPreparedDecorations = (trace: boolean): void => {
     if (trace) {
-      this.decorations.reInitDecorationCollection();
-      this.tracer.tracePythonScript({
-        rootDir: this.rootExtensionDir,
-        afterInstall: this.traceOrRenderPreparedDecorations, // Recurse if Hunter had to be installed first,
-        onData: this.onPythonDataSuccess,
-        onError: this.onPythonDataError
-      } as WolfTracerInterface);
+      this.traceAndRenderDecorationsForActiveSession();
     } else {
       this.renderPreparedDecorationsForActiveSession();
     }
@@ -234,16 +256,12 @@ export class WolfAPI {
     return this._decorationController;
   }
 
-  public get hotModeWarningDisabled() {
-    return this.config.get("disableHotModeWarning");
-  }
-
   public get isHot() {
     return this.config.get("hot");
   }
 
-  public get hotFrequency() {
-    return parseInt(this.config.get("hotFrequency"));
+  public get updateFrequency() {
+    return parseInt(this.config.get("updateFrequency"));
   }
 
   public get oldLineCount() {
@@ -264,6 +282,10 @@ export class WolfAPI {
 
   public get sessions() {
     return this._sessionController;
+  }
+
+  public get shouldShowHotModeWarning() {
+    return this.config.get("disableHotModeWarning") !== true;
   }
 
   public get stickys() {

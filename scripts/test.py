@@ -1,16 +1,26 @@
 
 inputs = [
-    [6.4, 2.8, 5.6, 2.2, 2],
+    [6.4, 2.8, 5.6, 2.2, 3],
     [5.0, 2.3, 3.3, 1.0, 1],
     [4.9, 2.5, 4.5, 1.7, 2],
     [4.9, 3.1, 1.5, 0.1, 0],
     [5.7, 3.8, 1.7, 0.3, 0]
 ]
 
+import sys
+import os
+
+
 features = [x[0:-1] for x in inputs]  # ?
 labels = [x[-1] for x in inputs]  # ?
 
-hat = labels  # ?
+result = []
+for i in inputs:
+    result.append(i[0:-1])
+
+result
+
+1 * 82  # ?
 
 print(features)
 print(labels)
@@ -22,7 +32,7 @@ def add2(a):
     return rv
 
 
-a = add2(1)  # ?
+a = add2(1)
 a += add2(2)  # ?
 a += add2(3)  # ?
 
@@ -35,14 +45,32 @@ print('before', b)
 b.pop()  # ?
 
 tup = (1, 2, 3)  # ?
-
 tup
+
+
+def fib(n):  # {
+    """ sadfasdf
+    asdfasdf
+     """
+    if n < 2:
+        return n
+    return fib(n-2) + fib(n-1)
+
+
+fib(5)  # ?
+
+
+class Employee:
+    def __init__(self, pay, age, name):
+        self.pay = pay
+        self.age = age
+        # self.name =
 
 
 def linked_list_from(*items):
     head = None  # ?
     for new_head in items[::-1]:
-        head = (new_head, head)  # ?
+        head = (new_head, head)
     return head
 
 
@@ -130,6 +158,7 @@ for t in range(5):
 
 b = [1, 2]
 
+
 b.pop()  # ?
 
 
@@ -140,7 +169,6 @@ a
 
 
 def contains_any(*args):
-    args
     return any(i in args[-1] for i in args[:-1])  # ?
 
 
@@ -153,6 +181,3 @@ while a < 5:
     a
     print('Tick', a)
     a += 1
-
-
-0/0

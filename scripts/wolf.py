@@ -32,7 +32,7 @@ from copy import deepcopy
 from pprint import pformat
 from functools import wraps
 from importlib import util
-from contextlib import contextmanager, redirect_stdout
+from contextlib import contextmanager
 from threading import Thread
 
 try:
@@ -49,11 +49,11 @@ except ImportError:
 # This is to help us find lines tagged with a Wolf
 # macro. If the line has a print statement, then we
 # want the expression being printed, if it's a
-# single variable, we want that.
+# single variable, we want that. Etc..
 #
 # NOTE: See https://regex101.com/r/sf6nAH/15 for more info
 WOLF_MACROS = re.compile(
-    r"^(?!pass\s+|from\s+|import\s+|return\s+|continue\s+|if\s+|for\s+)((?P<variable>\w+)$|^(print\((?P<print>.+)\))|^(?P<macro_source>(?P<local>[^\d\W]+\s)*((?P<assignment>\=)?(?P<operator>\+\=|\-\=|\*\=|\\\=)* *)*(?P<macro>[^#\s].+)\#\s?\?[^\n]*))")
+    r"^(?!pass\s+|from\s+|import\s+|return\s+|continue\s+|if\s+|for\s+)((?P<variable>\w+)$|^(print\((?P<print>.+)\))|^(?P<macro_source>(?P<local>[^\d\W]+\s)*((?P<assignment>\=)?(?P<operator>\+\=|\-\=|\*\=|\\\=)* *)*(?P<macro>[\w\{\[\(].+)\#\s?\?[^\n]*))")
 
 # XXX: For parsing hunter.CodePrinter output see:
 # https://regex101.com/r/sf6nAH/2
@@ -166,6 +166,17 @@ def get_line_from_file(_file, lineno):
         return lines[lineno - 1]
     else:
         return ""
+
+
+def try_deepcopy(obj):
+    """ 
+        Deepcopy can throw a type error when sys modules are to be
+        included in the object being copied..
+    """
+    try:
+        return deepcopy(obj)
+    except TypeError:
+        return obj
 
 
 ###################
@@ -319,26 +330,32 @@ def result_handler(event):
 
         # Simplest case.
         if match.group('variable'):
-            value = parse_eval(match.group('variable'),
-                               _globals, _locals, event=event)
+            if event.kind != 'call':
+                value = parse_eval(match.group('variable'),
+                                   _globals, _locals, event=event)
+                metadata["source"] = event['source'],
+            else:
+                skip = True
 
         # A little magic to parse print args
         if match.group('print'):
             buffer = io.StringIO()
-            to_eval = "print({}, file=wolf__buffer__)".format(
-                match.group('print'))
-            exec(to_eval, _globals, {**_locals, 'wolf__buffer__': buffer})
-            value = str(buffer.getvalue()).strip('\n')
-            buffer.close()
+            try:
+                to_eval = "print({}, file=wolf__buffer__)".format(
+                    match.group('print'))
+                exec(to_eval, _globals, {**_locals, 'wolf__buffer__': buffer})
+                value = str(buffer.getvalue()).strip('\n')
+            finally:
+                buffer.close()
 
         # Macros require a few more steps..
         if match.group('macro'):
 
             # XXX: This is to help avoid side effects when evaluating expressions
-            m_locals_copy = deepcopy(_locals)
-            m_globals_copy = deepcopy(_globals)
+            m_locals_copy = {k: try_deepcopy(v) for k, v in _locals.items()}
+            m_globals_copy = {k: try_deepcopy(v) for k, v in _globals.items()}
 
-            # The expression to be evaluated
+            # Basic macro to evaluate
             value = parse_eval(match.group('macro').strip(),
                                m_globals_copy, m_locals_copy, event=event)
 
@@ -400,8 +417,8 @@ def import_and_trace_script(module_name, module_path):
 
         NOTE: script_path is necessary here for relative imports to work
     """
-    with script_path(os.path.abspath(os.path.dirname(module_path))):
-        with trace(filename_filter(module_path), action=result_handler):
+    with trace(filename_filter(module_path), action=result_handler):
+        with script_path(os.path.abspath(os.path.dirname(module_path))):
             import_file(module_name, module_path)
 
 
@@ -410,8 +427,8 @@ def debug_import_and_trace_script(module_name, module_path):
         XXX: For testing purposes.. This bypasses the timeout which would
         otherwise stop the debugging sessions when the timeout expires.
     """
-    with script_path(os.path.abspath(os.path.dirname(module_path))):
-        with trace(filename_filter(module_path), action=result_handler):
+    with trace(filename_filter(module_path), action=result_handler):
+        with script_path(os.path.abspath(os.path.dirname(module_path))):
             import_file(module_name, module_path)
 
 
@@ -472,9 +489,6 @@ def main(filename):
         print(message, file=sys.stderr)
         return 1
 
-    # If this is for debugging, we'll need to disable the timeout..
-    debug_session = os.environ.get('WOLF_DEBUG_SESSION', False)
-
     # The full path to the script (including filename and extension)
     full_path = os.path.abspath(filename)
 
@@ -482,9 +496,8 @@ def main(filename):
     # ie: /home/duroktar/scripts/my_script.py  ->  my_script
     module_name = os.path.basename(full_path).split('.')[0]
 
-    # Okay, so let's go ahead and fire this thing up.
     try:
-        if debug_session == 'true':
+        if os.environ.get('WOLF_DEBUG_SESSION') == 'true':
             debug_import_and_trace_script(module_name, full_path)
         else:
             import_and_trace_script(module_name, full_path)

@@ -72,6 +72,7 @@ export interface WolfTraceLineResult {
 export type WolfParsedTraceResults = WolfTraceLineResult[] | null;
 
 export interface WolfTracerInterface {
+  fileName: string;
   rootDir: string;
   afterInstall: () => void;
   onData: (WolfParsedTraceResults) => void;

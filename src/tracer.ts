@@ -1,7 +1,7 @@
 import * as path from "path";
 import { installHunter } from "./hunterInstaller";
 import { WolfTracerInterface, WolfParsedTraceResults } from "./types";
-import { getActiveEditor, getActiveFileName, indexOrLast } from "./utils";
+import { getActiveEditor, indexOrLast } from "./utils";
 
 const { spawn } = require("child_process");
 
@@ -10,25 +10,40 @@ export function pythonTracerFactory() {
 }
 
 export class PythonTracer {
-  private getPythonRunner(rootDir) {
-    const scriptName: string = getActiveFileName();
+  private getPythonRunner(rootDir: string, scriptName: string) {
     const wolfPath: string = path.join(rootDir, "scripts/wolf.py");
     return spawn("python", [wolfPath, scriptName]);
   }
 
-  public tracePythonScript({
+  public tracePythonScriptForActiveEditor({
     rootDir,
     afterInstall,
     onData,
     onError
   }: WolfTracerInterface) {
-    if (!getActiveEditor()) return;
+    return this.tracePythonScriptForDocument({
+      fileName: getActiveEditor().document.fileName,
+      rootDir,
+      afterInstall,
+      onData,
+      onError
+    });
+  }
 
-    const python = this.getPythonRunner(rootDir);
+  public tracePythonScriptForDocument({
+    fileName,
+    rootDir,
+    afterInstall,
+    onData,
+    onError
+  }: WolfTracerInterface) {
+    if (!fileName) return;
+
+    const python = this.getPythonRunner(rootDir, fileName);
 
     python.stderr.on("data", (data: Buffer) => {
       if (data.includes("IMPORT_ERROR")) {
-        installHunter(afterInstall);
+        onError(installHunter(afterInstall));
       } else {
         onError(data.toString());
       }
@@ -36,9 +51,7 @@ export class PythonTracer {
 
     python.stdout.on("data", (data: Buffer): void => {
       const wolfResults: WolfParsedTraceResults = this.tryParsePythonData(data);
-      if (wolfResults) {
-        onData(wolfResults);
-      }
+      onData(wolfResults || ([] as WolfParsedTraceResults));
     });
   }
 
