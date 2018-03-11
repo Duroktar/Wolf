@@ -10,6 +10,8 @@ export function pythonTracerFactory() {
 }
 
 export class PythonTracer {
+  private timeout = null;
+
   private getPythonRunner(rootDir: string, scriptName: string) {
     const wolfPath: string = path.join(rootDir, "scripts/wolf.py");
     return spawn("python", [wolfPath, scriptName]);
@@ -39,7 +41,12 @@ export class PythonTracer {
   }: WolfTracerInterface) {
     if (!fileName) return;
 
+    if (this.timeout !== null) {
+      clearTimeout(this.timeout)
+    }
     const python = this.getPythonRunner(rootDir, fileName);
+    this.timeout = setTimeout(function(){ python.kill()}, 10 * 1000);
+    
 
     python.stderr.on("data", (data: Buffer) => {
       if (data.includes("IMPORT_ERROR")) {
