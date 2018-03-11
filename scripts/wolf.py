@@ -38,7 +38,7 @@ from threading import Thread
 try:
     from hunter import trace
 except ImportError:
-    print('IMPORT_ERROR: hunter not installed.', file=sys.stderr)
+    print('IMPORT_ERROR: Error importing Hunter', file=sys.stderr)
     exit(1)
 
 
@@ -68,70 +68,6 @@ def logout(*args, p=False):
 
 def logerr(*args):
     print(pformat(args, width=200, indent=2), file=sys.stderr)
-
-# Slightly modified code taken from:
-# https://www.saltycrane.com/blog/2010/04/using-python-timeout-decorator-uploading-s3/
-
-
-class TimeoutError(Exception):
-    def __init__(self, value="Timed Out"):
-        self.value = value
-
-    def __str__(self):
-        return repr(self.value)
-
-
-def timeout(seconds_before_timeout):
-    _timeout_err = TimeoutError('Wolf timed out after [%s seconds] exceeded!' %
-                                seconds_before_timeout)
-
-    if(os.name == 'nt'):
-        # windows does not support SIGALRM so we have to use a custom decorator :/
-        # adapted from https://stackoverflow.com/questions/21827874/timeout-a-python-function-in-windows
-        # Added v0.1.4 by Almenon
-        def deco(func):
-            @wraps(func)
-            def wrapper(*args, **kwargs):
-                res = [_timeout_err]
-
-                def newFunc():
-                    try:
-                        res[0] = func(*args, **kwargs)
-                    except Exception as e:
-                        res[0] = e
-                t = Thread(target=newFunc)
-                t.daemon = True
-                try:
-                    t.start()
-                    t.join(seconds_before_timeout)
-                except Exception as e:
-                    print('THREAD_ERROR: error starting thread', file=sys.stderr)
-                    raise e
-                ret = res[0]
-                if isinstance(ret, BaseException):
-                    raise ret
-                return ret
-            return wrapper
-        return deco
-
-    else:  # mac / linux
-        def decorate(f):
-            def handler(signum, frame):
-                raise _timeout_err
-
-            @wraps(f)
-            def new_f(*args, **kwargs):
-                old = signal.signal(signal.SIGALRM, handler)
-                signal.alarm(seconds_before_timeout)
-                try:
-                    result = f(*args, **kwargs)
-                finally:
-                    signal.signal(signal.SIGALRM, old)
-                signal.alarm(0)
-                return result
-            return new_f
-        return decorate
-###########
 
 
 def import_file(full_name, fullpath):
@@ -324,7 +260,9 @@ def result_handler(event):
     # # how it works.
     match = WOLF_MACROS.search(source)
 
+    # Sometimes we have to skip an entry to prevent dupes
     skip = False
+
     # Regex match groups are used for convenience.
     if match:
 
@@ -407,7 +345,6 @@ def filename_filter(filename):
     return lambda event: bool(event['filename'] == filename)
 
 
-@timeout(10)
 def import_and_trace_script(module_name, module_path):
     """
         As the name suggests, this imports and traces the target script.
@@ -417,18 +354,8 @@ def import_and_trace_script(module_name, module_path):
 
         NOTE: script_path is necessary here for relative imports to work
     """
-    with trace(filename_filter(module_path), action=result_handler):
-        with script_path(os.path.abspath(os.path.dirname(module_path))):
-            import_file(module_name, module_path)
-
-
-def debug_import_and_trace_script(module_name, module_path):
-    """
-        XXX: For testing purposes.. This bypasses the timeout which would
-        otherwise stop the debugging sessions when the timeout expires.
-    """
-    with trace(filename_filter(module_path), action=result_handler):
-        with script_path(os.path.abspath(os.path.dirname(module_path))):
+    with script_path(os.path.abspath(os.path.dirname(module_path))):
+        with trace(filename_filter(module_path), action=result_handler):
             import_file(module_name, module_path)
 
 
@@ -497,10 +424,8 @@ def main(filename):
     module_name = os.path.basename(full_path).split('.')[0]
 
     try:
-        if os.environ.get('WOLF_DEBUG_SESSION') == 'true':
-            debug_import_and_trace_script(module_name, full_path)
-        else:
-            import_and_trace_script(module_name, full_path)
+        
+        import_and_trace_script(module_name, full_path)
 
     except Exception as e:
 
@@ -514,6 +439,7 @@ def main(filename):
         tb = traceback.extract_tb(exc_traceback)[-1]
         if isinstance(e, SyntaxError):
             lineno = getattr(e, 'lineno')
+            value = e.msg
         else:
             lineno = tb[1]
         source = get_line_from_file(full_path, tb[1])
@@ -523,28 +449,20 @@ def main(filename):
             "value":            value,
             "error":             True,
         }
+
         # And tack the error on to the end of the response.
         WOLF.append(metadata)
 
     else:
-        # Otherwise clip the final return code/message from the stack
-        # so it doesn't hide the last decoration.
-        if WOLF:
+        # We sometimes clip the final return code/message from the stack
+        # so it doesn't hide the last decoration. If it's the only entry
+        # then just leave it.
+        if WOLF and len(WOLF) != 1:
             WOLF.pop()
 
-    if WOLF:
-        # For testing purposes
-        # logerr(WOLF)
-
-        # We must have some data ready for the client, let's print
-        # the results and return a 0 for the exit code
-        wolf_prints()
-        return 0
-
-    # This isn't necessarily an error (maybe the file is empty). Either
-    # way, we'll return 1 so the extension can skip the render loop by
-    # minding the status code.
-    return 1
+    # print the results and return a 0 for the exit code
+    wolf_prints()
+    return 0
 
 
 if __name__ == '__main__':
