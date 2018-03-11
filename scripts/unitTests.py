@@ -42,12 +42,12 @@ class TestPythonEvaluator(unittest.TestCase):
         assert returnStatus != 1
 
     def test_simple_code(self):
-        # Returns 1 if no annotations to print
+        # Returns 0 if no annotations to print
         target = get_target("simplestTest.py")
         with buffer_stream() as buf:
             with redirect_stdout(buf):
                 returnStatus = wolf.main(target)
-        assert returnStatus == 1
+        assert returnStatus == 0
 
     def test_snapshot(self):
         target = get_target("complex.test.py")
