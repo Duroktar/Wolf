@@ -241,6 +241,7 @@ def result_handler(event):
     metadata = {
         "lineno":             event['lineno'],
         "source":     event['source'].strip(),
+        "kind":                 event['kind'],
         # "value"    <-  Defined below MAYBE..
     }
 
@@ -424,7 +425,7 @@ def main(filename):
     module_name = os.path.basename(full_path).split('.')[0]
 
     try:
-        
+
         import_and_trace_script(module_name, full_path)
 
     except Exception as e:
@@ -453,11 +454,11 @@ def main(filename):
         # And tack the error on to the end of the response.
         WOLF.append(metadata)
 
-    else:
-        # We sometimes clip the final return code/message from the stack
-        # so it doesn't hide the last decoration. If it's the only entry
-        # then just leave it.
-        if WOLF and len(WOLF) != 1:
+    if len(WOLF) > 1:
+        # This prevents the return value of the script from
+        # being assigned to the last annotation, causing a
+        # duplicate decoration to appear.
+        if WOLF[-1]['kind'] == 'return':
             WOLF.pop()
 
     # print the results and return a 0 for the exit code
