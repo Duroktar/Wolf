@@ -4,7 +4,9 @@
   "version": "0.3.0",
   "scripts": {
     "test": "python scripts/wolf.py scripts/test.py",
-    "test:unittests": "python scripts/unitTests.py"
+    "test:unittests": "python scripts/unitTests.py",
+    "generate:snapshot":
+      "python scripts/wolf.py scripts/testInputs/complex.test.py"
   },
   "dependencies": {
     "hunter": "~=2.0.2"
