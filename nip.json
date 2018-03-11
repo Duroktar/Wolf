@@ -1,7 +1,7 @@
 {
   "name": "Wolf",
   "author": "Scott Doucet",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "scripts": {
     "test": "python scripts/wolf.py scripts/test.py",
     "test:unittests": "python scripts/unitTests.py",
