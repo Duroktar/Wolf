@@ -7,25 +7,34 @@
       "type": "python",
       "request": "launch",
       "stopOnEntry": true,
-      "pythonPath": "${workspaceFolder}/python_modules/bin/python3",
-      "program": "${workspaceFolder}/scripts/wolf.py",
+      "pythonPath": "${config:python.pythonPath}",
+      "program": "${workspaceFolder}/\\scripts/\\wolf.py",
       "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
       "env": {
         "WOLF_DEBUG_SESSION": true
       },
       "envFile": "${workspaceFolder}/.env",
-      "debugOptions": ["RedirectOutput"],
-      "args": ["${workspaceFolder}/scripts/test.py"]
+      "debugOptions": [
+        "RedirectOutput"
+      ],
+      "args": [
+        "${workspaceFolder}/scripts/test.py"
+      ]
     },
     {
       "name": "Launch Extension",
       "type": "extensionHost",
       "request": "launch",
       "runtimeExecutable": "${execPath}",
-      "args": ["--extensionDevelopmentPath=${workspaceRoot}"],
+      "args": [
+        "--extensionDevelopmentPath=${workspaceRoot}"
+      ],
       "stopOnEntry": false,
       "sourceMaps": true,
-      "outFiles": ["${workspaceRoot}/out/src/**/*.js"],
+      "outFiles": [
+        "${workspaceRoot}/out/src/**/*.js"
+      ],
       "preLaunchTask": "npm"
     },
     {
@@ -39,7 +48,9 @@
       ],
       "stopOnEntry": false,
       "sourceMaps": true,
-      "outFiles": ["${workspaceRoot}/out/test/**/*.js"],
+      "outFiles": [
+        "${workspaceRoot}/out/test/**/*.js"
+      ],
       "preLaunchTask": "npm"
     },
     {
@@ -49,7 +60,9 @@
       "protocol": "inspector",
       "port": 5870,
       "restart": true,
-      "outFiles": ["${workspaceRoot}/out/src"]
+      "outFiles": [
+        "${workspaceRoot}/out/src"
+      ]
     }
   ]
 }
