@@ -8,7 +8,10 @@
   "engines": {
     "vscode": "^1.12.0"
   },
-  "categories": ["Debuggers", "Other"],
+  "categories": [
+    "Debuggers",
+    "Other"
+  ],
   "activationEvents": [
     "onCommand:wolf.barkAtCurrentFile",
     "onCommand:wolf.touchBarStart"
@@ -22,20 +25,17 @@
         "wolf.pawPrintsInGutter": {
           "type": "boolean",
           "default": true,
-          "description":
-            "Use Paw Print style icons in the gutter. ie: To the left of the editor, next to the line numbers."
+          "description": "Use Paw Print style icons in the gutter. ie: To the left of the editor, next to the line numbers."
         },
         "wolf.updateFrequency": {
           "type": "number",
           "default": 500,
-          "description":
-            "Set the minimum time between Wolf live updates in milliseconds. A higher number means a longer time between updates. (Valid range: 100 - 1000)"
+          "description": "Set the minimum time between Wolf live updates in milliseconds. A higher number means a longer time between updates. (Valid range: 100 - 1000)"
         },
         "wolf.disableHotModeWarning": {
           "type": "boolean",
           "default": false,
-          "description":
-            "Disables the Hot Mode warning upon entering a wolf session."
+          "description": "Disables the Hot Mode warning upon entering a wolf session."
         },
         "wolf.printLoggingEnabled": {
           "type": "boolean",

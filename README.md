@@ -26,10 +26,6 @@ Wolf is Good for:
 
 ![basic-example](images/basic_example.png)
 
-> `NOTE`: For this to work you must put only the variable
-> name and not an expression; the annotations (16)
-> cannot be edited.
-
 ---
 
 ### Works inside functions
@@ -84,14 +80,6 @@ Wolf is Good for:
 
 * Visual Studio Code
 * Python 3.5 - 3.6
-* `Hunter` library, available on
-  PyPi.
-
-> NOTE: If hunter is not found, you will be given the option to
-> have it installed into to the "--user" directory automatically.
->
-> ie: Wolf will perform `pip install hunter --user` in the cwd of
-> the script.
 
 ## Extension Settings
 
