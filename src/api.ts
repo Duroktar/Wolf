@@ -17,7 +17,8 @@ import {
   TextDocumentChangeEvent,
   TextDocument,
   TextEditor,
-  workspace
+  workspace,
+  WorkspaceConfiguration
 } from "vscode";
 import { WolfSessionController, wolfSessionStoreFactory } from "./sessions";
 import { WolfStickyController, wolfStickyControllerFactory } from "./sticky";

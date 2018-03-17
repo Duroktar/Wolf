@@ -53,11 +53,12 @@ export function activate(context: ExtensionContext) {
       if (wolfAPI.sessions.sessionIsActiveByDocument(editor.document)) {
         if (wolfAPI.configChanged) {
           vscode.window.showInformationMessage(
-            "Wolf detected a change to the Hot Mode configuration and was shut off. " +
-              "Start Wolf again to continue."
+            "Wolf detected a change to the Hot Mode configuration and was shut off.. " +
+              "Attempting to restart."
           );
           wolfAPI.setConfigUpdatedFlag(false);
           stopWolf();
+          startWolf();
         } else {
           wolfAPI.enterWolfContext();
           throttledHandleDidChangeTextDocument({
@@ -79,7 +80,8 @@ export function activate(context: ExtensionContext) {
   function changedConfiguration(event): void {
     if (
       event.affectsConfiguration("wolf.pawPrintsInGutter") ||
-      event.affectsConfiguration("wolf.updateFrequency")
+      event.affectsConfiguration("wolf.updateFrequency") ||
+      event.affectsConfiguration("wolf.maxLineLength")
     ) {
       wolfAPI.setConfigUpdatedFlag(true);
     }

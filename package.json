@@ -37,6 +37,12 @@
           "description":
             "Disables the Hot Mode warning upon entering a wolf session."
         },
+        "wolf.maxLineLength": {
+          "type": "number",
+          "default": 100,
+          "description":
+            "The maximum length of line decorations. Lines longer than this are truncated (ex: 97, 98, 99, ... )"
+        },
         "wolf.printLoggingEnabled": {
           "type": "boolean",
           "default": true,

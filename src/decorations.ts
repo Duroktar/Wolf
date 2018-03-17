@@ -26,7 +26,8 @@ import { wolfIconProvider } from "./icons";
 import {
   getActiveEditor,
   formatWolfResponseElement,
-  stringEscape
+  stringEscape,
+  clamp
 } from "./utils";
 const beautify = require("js-beautify").js;
 
@@ -66,6 +67,9 @@ export class WolfDecorationsController {
   private createWolfDecorationOptions = (
     options: WolfDecorationOptions
   ): DecorationOptions => {
+    const truncLength: number = workspace
+      .getConfiguration("wolf")
+      .get("maxLineLength");
     return {
       range: options.range,
       hoverMessage: {
@@ -74,7 +78,8 @@ export class WolfDecorationsController {
       },
       renderOptions: {
         after: {
-          contentText: options.text,
+          contentText:
+            options.text.slice(0, clamp(1, 1000, truncLength)) + " ...",
           fontWeight: "normal",
           fontStyle: "normal",
           color: wolfTextColorProvider(options.color)
