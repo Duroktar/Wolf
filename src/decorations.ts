@@ -70,6 +70,8 @@ export class WolfDecorationsController {
     const truncLength: number = workspace
       .getConfiguration("wolf")
       .get("maxLineLength");
+    const textLength: number = options.text.length;
+    const ellipsis: string = textLength > truncLength ? " ..." : "";
     return {
       range: options.range,
       hoverMessage: {
@@ -79,7 +81,7 @@ export class WolfDecorationsController {
       renderOptions: {
         after: {
           contentText:
-            options.text.slice(0, clamp(1, 1000, truncLength)) + " ...",
+            options.text.slice(0, clamp(1, 1000, truncLength)) + ellipsis,
           fontWeight: "normal",
           fontStyle: "normal",
           color: wolfTextColorProvider(options.color)
