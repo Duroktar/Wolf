@@ -1,12 +1,17 @@
 import * as vscode from "vscode";
-import { ExtensionContext, TextDocumentChangeEvent } from "vscode";
+import {
+  ExtensionContext,
+  OutputChannel,
+  TextDocumentChangeEvent
+} from "vscode";
 
 import { wolfStandardApiFactory, WolfAPI } from "./api";
 import { ActiveTextEditorChangeEventResult } from "./types";
 import { clamp, registerCommand } from "./utils";
 
 export function activate(context: ExtensionContext) {
-  const wolfAPI: WolfAPI = wolfStandardApiFactory(context);
+  const output: OutputChannel = vscode.window.createOutputChannel("Wolf");
+  const wolfAPI: WolfAPI = wolfStandardApiFactory(context, { output });
 
   initializeWolfExtension();
 

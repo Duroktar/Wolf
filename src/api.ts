@@ -13,6 +13,7 @@ import {
   commands,
   extensions,
   ExtensionContext,
+  OutputChannel,
   TextDocumentChangeEvent,
   TextDocument,
   TextEditor,
@@ -23,12 +24,18 @@ import { WolfStickyController, wolfStickyControllerFactory } from "./sticky";
 import { PythonTracer, pythonTracerFactory } from "./tracer";
 import { getActiveEditor, makeTempFile } from "./utils";
 import { hotModeWarning } from "./hotWarning";
+import { wolfOutputFactory, WolfOutputController } from "./output";
 
-export function wolfStandardApiFactory(context: ExtensionContext) {
+export function wolfStandardApiFactory(
+  context: ExtensionContext,
+  options: { output: OutputChannel }
+) {
   const wolfDecorationStore = wolfDecorationStoreFactory(context);
+  const wolfOutputChannel = wolfOutputFactory(options.output);
 
   return new WolfAPI(
     context,
+    wolfOutputChannel,
     wolfDecorationStore,
     wolfSessionStoreFactory(),
     wolfStickyControllerFactory(wolfDecorationStore),
@@ -41,6 +48,7 @@ export class WolfAPI {
   public _changedConfigFlag: boolean = false;
   constructor(
     public context: ExtensionContext,
+    private _outputController: WolfOutputController,
     private _decorationController: WolfDecorationsController,
     private _sessionController: WolfSessionController,
     private _stickyController: WolfStickyController,
@@ -138,16 +146,21 @@ export class WolfAPI {
     return this.sessions.sessionIsActiveByDocument(document);
   };
 
+  public logToOutput = (...text): void => {
+    this._outputController.clear();
+    this._outputController.log(text.join(" "));
+  };
+
   private onPythonDataSuccess = (data: WolfParsedTraceResults): void => {
     this.prepareAndRenderDecorationsForActiveSession(data);
     if (this.printLogging) {
-      console.log("WOLF:", JSON.stringify(data, null, 4));
-      console.log("Wolf Total Line Count:", data.length);
+      this.logToOutput("(Wolf Output):", JSON.stringify(data, null, 4));
+      this.logToOutput("\n\nTotal Line Count:", data.length);
     }
   };
 
   private onPythonDataError = (data): void => {
-    console.error("WOLF STDERR OUPTUT:", data);
+    this.logToOutput("(Wolf Error):", data);
   };
 
   private prepareAndRenderDecorationsForActiveSession = (
