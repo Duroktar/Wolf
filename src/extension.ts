@@ -100,7 +100,7 @@ export function activate(context: ExtensionContext) {
       clearTimeout(updateTimeout);
     }
     updateTimeout = setTimeout(
-      () => wolfAPI.handleDidChangeTextDocument(event),
+      () => wolfAPI.handleDidChangeTextDocument(event.document),
       clamp(100, 10000, wolfAPI.updateFrequency)
     );
   }

@@ -119,11 +119,9 @@ export class WolfAPI {
     return data.filter(visitor);
   };
 
-  public handleDidChangeTextDocument = (
-    event: TextDocumentChangeEvent
-  ): void => {
-    const tempFileObj = makeTempFile(event.document.fileName);
-    const newSource = event.document.getText();
+  public handleDidChangeTextDocument = (document: TextDocument): void => {
+    const tempFileObj = makeTempFile(document.fileName);
+    const newSource = document.getText();
     this.clearDecorationsForActiveSession();
     this.decorations.reInitDecorationCollection();
     fs.writeFileSync(tempFileObj.name, newSource);
@@ -147,20 +145,32 @@ export class WolfAPI {
   };
 
   public logToOutput = (...text): void => {
-    this._outputController.clear();
     this._outputController.log(text.join(" "));
   };
+
+  private prettyPrintWolfData(data: WolfParsedTraceResults): string[] {
+    return data.map(
+      l =>
+        `LINENO: ${l.lineno} - VALUE: ${l.value}${
+          l.error ? `, ERROR: ${l.error}` : ""
+        }`
+    );
+  }
 
   private onPythonDataSuccess = (data: WolfParsedTraceResults): void => {
     this.prepareAndRenderDecorationsForActiveSession(data);
     if (this.printLogging) {
-      this.logToOutput("(Wolf Output):", JSON.stringify(data, null, 4));
+      let prettyWolf = this.prettyPrintWolfData(data);
+      this._outputController.clear();
+      this.logToOutput("(Wolf Output):", JSON.stringify(prettyWolf, null, 4));
       this.logToOutput("\n\nTotal Line Count:", data.length);
     }
   };
 
   private onPythonDataError = (data): void => {
-    this.logToOutput("(Wolf Error):", data);
+    if (this.shouldLogErrors) {
+      this.logToOutput("(Wolf Error):", data);
+    }
   };
 
   private prepareAndRenderDecorationsForActiveSession = (
@@ -295,6 +305,10 @@ export class WolfAPI {
 
   public get sessions() {
     return this._sessionController;
+  }
+
+  public get shouldLogErrors() {
+    return this.config.get("logErrors") === true;
   }
 
   public get shouldShowHotModeWarning() {
