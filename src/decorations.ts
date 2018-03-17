@@ -172,7 +172,7 @@ export class WolfDecorationsController {
       lineno: lineNo,
       error: line.error ? true : false,
       loop: line.hasOwnProperty("_loop"),
-      pretty: [...existing.pretty, stringEscape(pretty)]
+      pretty: [...existing.pretty, pretty]
     } as WolfLineDecoration;
     this.setDecorationAtLine(lineNo, decoration);
   };

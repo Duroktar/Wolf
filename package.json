@@ -2,7 +2,7 @@
   "name": "wolf",
   "displayName": "Wolf",
   "description": "Python live scratchpad",
-  "version": "0.3.7",
+  "version": "0.3.8",
   "publisher": "traBpUkciP",
   "license": "Apache-2.0",
   "engines": {
