@@ -71,6 +71,12 @@ Wolf is Good for:
 
 ---
 
+### Relative imports and paths all just work!
+
+![path-example](images/path_example.png)
+
+---
+
 ## What people are saying about Wolf
 
 * **Very impressive work!** ~ [Quokka.js](https://quokkajs.com/)
