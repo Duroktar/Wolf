@@ -1,4 +1,4 @@
-# Wolf - It kicks the Quokkas ass
+# Wolf - Live Python editing for VS-Code
 
 [![Version](https://vsmarketplacebadge.apphb.com/version-short/traBpUkciP.wolf.svg)](https://vsmarketplacebadge.apphb.com/version-short/traBpUkciP.wolf.svg)
 [![Build Status](https://travis-ci.org/Duroktar/Wolf.svg?branch=master)](https://travis-ci.org/Duroktar/Wolf)
