@@ -4,9 +4,7 @@
   "version": "0.3.2",
   "scripts": {
     "test": "python scripts/wolf.py scripts/test.py",
-    "test:unittests": "python scripts/unitTests.py",
-    "generate:snapshot":
-      "python scripts/wolf.py scripts/testInputs/complex.test.py"
+    "test:unittests": "python scripts/unitTests.py"
   },
   "dev_dependencies": {
     "autopep8": "~=1.3.4",
