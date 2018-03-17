@@ -23,7 +23,12 @@ import {
 } from "./types";
 import { wolfTextColorProvider } from "./colors";
 import { wolfIconProvider } from "./icons";
-import { getActiveEditor, formatWolfResponseElement } from "./utils";
+import {
+  getActiveEditor,
+  formatWolfResponseElement,
+  stringEscape,
+  clamp
+} from "./utils";
 const beautify = require("js-beautify").js;
 
 export function wolfDecorationStoreFactory(context: ExtensionContext) {
@@ -62,6 +67,11 @@ export class WolfDecorationsController {
   private createWolfDecorationOptions = (
     options: WolfDecorationOptions
   ): DecorationOptions => {
+    const truncLength: number = workspace
+      .getConfiguration("wolf")
+      .get("maxLineLength");
+    const textLength: number = options.text.length;
+    const ellipsis: string = textLength > truncLength ? " ..." : "";
     return {
       range: options.range,
       hoverMessage: {
@@ -70,7 +80,8 @@ export class WolfDecorationsController {
       },
       renderOptions: {
         after: {
-          contentText: options.text,
+          contentText:
+            options.text.slice(0, clamp(1, 1000, truncLength)) + ellipsis,
           fontWeight: "normal",
           fontStyle: "normal",
           color: wolfTextColorProvider(options.color)
@@ -157,11 +168,10 @@ export class WolfDecorationsController {
       lineNo
     );
     const decoration = {
-      data: [...existing.data, annotation],
+      data: [...existing.data, stringEscape(annotation)],
       lineno: lineNo,
       error: line.error ? true : false,
       loop: line.hasOwnProperty("_loop"),
-      source: line.source,
       pretty: [...existing.pretty, pretty]
     } as WolfLineDecoration;
     this.setDecorationAtLine(lineNo, decoration);
@@ -219,7 +229,7 @@ export class WolfDecorationsController {
       }
 
       const textLine: TextLine = editor.document.lineAt(lineIndex);
-      const source = decorationData.source;
+      const source = textLine.text;
       const decoRange = new Range(
         new Position(lineIndex, textLine.firstNonWhitespaceCharacterIndex),
         new Position(lineIndex, textLine.text.indexOf(source) + source.length)

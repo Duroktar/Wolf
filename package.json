@@ -2,7 +2,7 @@
   "name": "wolf",
   "displayName": "Wolf",
   "description": "Python live scratchpad",
-  "version": "0.3.4",
+  "version": "0.3.9",
   "publisher": "traBpUkciP",
   "license": "Apache-2.0",
   "engines": {
@@ -36,6 +36,12 @@
           "default": false,
           "description":
             "Disables the Hot Mode warning upon entering a wolf session."
+        },
+        "wolf.maxLineLength": {
+          "type": "number",
+          "default": 100,
+          "description":
+            "The maximum length of line decorations. Lines longer than this are truncated (ex: 97, 98, 99, ... )"
         },
         "wolf.printLoggingEnabled": {
           "type": "boolean",
@@ -126,7 +132,9 @@
     "postinstall": "node ./node_modules/vscode/bin/install",
     "test": "node ./node_modules/vscode/bin/test",
     "ext:package": "vsce package",
-    "ext:publish": "vsce publish"
+    "ext:publish": "vsce publish",
+    "gen:snapshot":
+      "python scripts/wolf.py scripts/testInputs/complex.test.py > scripts/testInputs/complex.snapshot.py36"
   },
   "devDependencies": {
     "@types/mocha": "^2.2.32",
