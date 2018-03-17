@@ -1,17 +1,13 @@
-import { TextEditor, TextDocument, WorkspaceConfiguration } from "vscode";
+import { TextEditor, TextDocument } from "vscode";
 import { WolfActiveSessionCollection } from "./types";
 import { getActiveEditor } from "./utils";
 
-export function wolfSessionStoreFactory(config: WorkspaceConfiguration) {
-  return new WolfSessionController(config);
+export function wolfSessionStoreFactory() {
+  return new WolfSessionController();
 }
 
 export class WolfSessionController {
   private _sessions: WolfActiveSessionCollection = {};
-
-  constructor(private config: WorkspaceConfiguration) {
-    this.config;
-  }
 
   public clearAllSessions(): void {
     this._sessions = {} as WolfActiveSessionCollection;

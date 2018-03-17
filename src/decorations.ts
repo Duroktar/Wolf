@@ -6,9 +6,9 @@ import {
   window,
   TextLine,
   ExtensionContext,
-  WorkspaceConfiguration,
   Range,
-  Position
+  Position,
+  workspace
 } from "vscode";
 import {
   WolfColorSelection,
@@ -18,17 +18,16 @@ import {
   WolfSessionDecorations,
   WolfStandardDecorationTypes,
   WolfTraceLineResult,
-  WolfParsedTraceResults
+  WolfParsedTraceResults,
+  WolfValue
 } from "./types";
 import { wolfTextColorProvider } from "./colors";
 import { wolfIconProvider } from "./icons";
 import { getActiveEditor, formatWolfResponseElement } from "./utils";
+const beautify = require("js-beautify").js;
 
-export function wolfDecorationStoreFactory(
-  context: ExtensionContext,
-  config: WorkspaceConfiguration
-) {
-  return new WolfDecorationsController(context, config);
+export function wolfDecorationStoreFactory(context: ExtensionContext) {
+  return new WolfDecorationsController(context);
 }
 
 export class WolfDecorationsController {
@@ -36,10 +35,7 @@ export class WolfDecorationsController {
   private _decorationTypes: WolfStandardDecorationTypes;
   private _preparedDecorations: WolfSessionDecorations;
 
-  constructor(
-    public context: ExtensionContext,
-    public config: WorkspaceConfiguration
-  ) {}
+  constructor(public context: ExtensionContext) {}
 
   private createEditorDecorationForGutters = (
     gutterIconColor: WolfColorSelection,
@@ -151,8 +147,12 @@ export class WolfDecorationsController {
   };
 
   public parseLineAndSetDecoration = (line: WolfTraceLineResult): void => {
-    const lineNo: number = line.line_number;
-    const annotation = formatWolfResponseElement(line);
+    const annotation: WolfValue = formatWolfResponseElement(line);
+    const lineNo: number = line.lineno;
+    const pretty: string = beautify(line.value, {
+      indent_size: 4,
+      space_in_empty_paren: true
+    });
     const existing: WolfLineDecoration = this.getLineDecorationOrDefault(
       lineNo
     );
@@ -162,7 +162,7 @@ export class WolfDecorationsController {
       error: line.error ? true : false,
       loop: line.hasOwnProperty("_loop"),
       source: line.source,
-      pretty: [...existing.pretty, line.pretty]
+      pretty: [...existing.pretty, pretty]
     } as WolfLineDecoration;
     this.setDecorationAtLine(lineNo, decoration);
   };
@@ -225,9 +225,8 @@ export class WolfDecorationsController {
         new Position(lineIndex, textLine.text.indexOf(source) + source.length)
       );
       const decoration: DecorationOptions = this.createWolfDecorationOptions({
-        // range: textLine.range,
         range: decoRange,
-        text: decorationData.data.join(" => "),
+        text: decorationData.data.join(" => "), // This seperator should be adjustable from the config
         hoverText: decorationData.pretty.join("\n"),
         color: decorationData.error ? "red" : "cornflower"
       } as WolfDecorationOptions);
@@ -293,6 +292,8 @@ export class WolfDecorationsController {
   }
 
   public get pawprints(): boolean {
-    return this.config.get("pawPrintsInGutter") ? true : false;
+    return workspace.getConfiguration("wolf").get("pawPrintsInGutter")
+      ? true
+      : false;
   }
 }

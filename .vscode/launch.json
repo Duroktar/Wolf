@@ -3,28 +3,33 @@
   "version": "0.1.0",
   "configurations": [
     {
-      "name": "Integrated Terminal/Console",
+      "name": "wolf.py Debug Session Windows",
       "type": "python",
       "request": "launch",
       "stopOnEntry": true,
-      "pythonPath": "${workspaceFolder}/python_modules/bin/python3",
-      "program": "${workspaceFolder}/scripts/wolf.py",
-      "cwd": "",
+      "pythonPath": "${config:python.pythonPath}",
+      "program": "${workspaceFolder}/\\scripts/\\wolf.py",
+      "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
-      "env": {},
+      "env": {
+        "WOLF_DEBUG_SESSION": true
+      },
       "envFile": "${workspaceFolder}/.env",
-      "debugOptions": [],
+      "debugOptions": ["RedirectOutput"],
       "args": ["${workspaceFolder}/scripts/test.py"]
     },
     {
-      "name": "Python",
+      "name": "wolf.py Debug Session Linux/OSX",
       "type": "python",
       "request": "launch",
       "stopOnEntry": true,
-      "pythonPath": "${workspaceFolder}/python_modules/bin/python3",
+      "pythonPath": "${config:python.pythonPath}",
       "program": "${workspaceFolder}/scripts/wolf.py",
       "cwd": "${workspaceFolder}",
-      "env": {},
+      "console": "integratedTerminal",
+      "env": {
+        "WOLF_DEBUG_SESSION": true
+      },
       "envFile": "${workspaceFolder}/.env",
       "debugOptions": ["RedirectOutput"],
       "args": ["${workspaceFolder}/scripts/test.py"]

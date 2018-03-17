@@ -5,7 +5,7 @@
 [![Downloads](https://vsmarketplacebadge.apphb.com/installs/traBpUkciP.wolf.svg)](https://vsmarketplacebadge.apphb.com/installs/traBpUkciP.wolf.svg)
 [![Rating](https://vsmarketplacebadge.apphb.com/rating/traBpUkciP.wolf.svg)](https://vsmarketplacebadge.apphb.com/rating/traBpUkciP.wolf.svg)
 
-Wolf is a VsCode extension that enables visual annotations of live Python code from inside the editor.
+Wolf is a VsCode extension that enables visual inspection of live Python code from the editor. It was inspired by [`Quokka.js:`](https://quokkajs.com/) `The Rapid Prototyping Playground for JavaScript and TypeScript` and my love of programming.
 
 Wolf is Good for:
 
@@ -16,30 +16,15 @@ Wolf is Good for:
 * Code Streamers
 * Planet Earth
 
-## Usage
-
-Click the blue Wolf in the upper right action bar inside any open Python source
-file to start a session. Once inside a running session, the Wolf icon will change
-color to red and can be clicked again to stop the session.
-
-## Features
-
-### Wolf Feature Overview
+## Wolf Feature Overview
 
 ![busy-example](images/busy_example.png)
 
-> `ProTip`: To enable `PawPrint` gutter icons, set the configuration
-> option `"wolf.pawPrintsInGutter": true`
-
-> `NOTE`: Requires restarting the Editor.
+## Other features
 
 ### Check out variables inline
 
 ![basic-example](images/basic_example.png)
-
-> `NOTE`: For this to work you must put only the variable
-> name and not an expression; the annotations (16)
-> cannot be edited.
 
 ---
 
@@ -86,18 +71,16 @@ color to red and can be clicked again to stop the session.
 
 ---
 
+## What people are saying about Wolf
+
+* **Very impressive work!** ~ [Quokka.js](https://quokkajs.com/)
+* **What the hell does it do?** ~ My Wife
+
 ## Requirements
 
 * Visual Studio Code
 * Python 3.5 - 3.6
-* `Hunter` library, available on
-  PyPi.
-
-> NOTE: If hunter is not found, you will be given the option to
-> have it installed into to the "--user" directory automatically.
->
-> ie: Wolf will perform `pip install hunter --user` in the cwd of
-> the script.
+* Hunter - Available on pip (pip install hunter)
 
 ## Extension Settings
 
@@ -105,6 +88,8 @@ This extension contributes the following settings:
 
 * `wolf.barkAtCurrentFile`: Starts Wolf on the current file.
 * `wolf.stopBarking`: Stops all running Wolf sessions.
+* `wolf.pawPrintsInGutter`: Use paw prints for gutter icons.
+* `wolf.updateFrequency`: Adjust the minimum timeframe before the file is saved during Hot Mode
 
 ## FAQ
 
@@ -159,6 +144,25 @@ You can't get any better than _live feedback next to the code you're editing_!
 
 ## **Changelog**
 
+## v0.3.0 ~ Minor Release
+
+### No Config Setup
+
+Wolf works in what was once called "Hot Mode" by default now. This means
+your live editing experience will be tuned for performance out
+of the box, with updating annotations on the fly.
+
+> NOTE: With these changes the following config options have been removed
+> or changed:
+
+> Removed Options:
+
+* `wolf.hot`: For enabling live re-loading. (Always on now)
+
+> Changed Options:
+
+* `wolf.hotFrequency` -> `wolf.updateFrequency`
+
 ## v0.2.0 ~ Minor Release
 
 ### Hot Reloading
@@ -177,7 +181,7 @@ Adjust minimum time between saves (throttle control) in milliseconds:
 
 > Note: Frequency setting is clamped between 100 and 1000 millisecends
 
-### Macros are Back
+### Macros are Back!!!
 
 A comment macro is any single line comment character (pound/hash symbol)
 followed by a question mark. See the examples above to get a better idea

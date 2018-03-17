@@ -6,7 +6,9 @@ import {
   WolfActiveSessionCollection,
   WolfValue
 } from "./types";
-import { Position, TextDocument, TextEditor } from "vscode";
+import { Disposable, Position, TextDocument, TextEditor } from "vscode";
+
+const tmp = require("tmp");
 
 export function annotatedLineIsChanged(
   document: TextDocument,
@@ -27,7 +29,7 @@ export function formatWolfResponseElement(
 ): WolfValue {
   const hasValue = element.hasOwnProperty("value");
 
-  if ((hasValue && element.kind === "line") || element.error) {
+  if (hasValue || element.error) {
     if (Array.isArray(element.value)) {
       return "[" + element.value.join(", ") + "]";
     }
@@ -51,7 +53,7 @@ export function getActiveFileName(): string {
   return getActiveEditor().document.fileName;
 }
 
-export function indexOrLast(string: string, target: string) {
+export function indexOrLast(string: string, target: string): number {
   let io: number = string.indexOf(target);
   return io === -1 ? -1 : io + target.length;
 }
@@ -59,7 +61,7 @@ export function indexOrLast(string: string, target: string) {
 export function isActiveSession(
   document: TextDocument,
   sessions: WolfActiveSessionCollection
-) {
+): boolean {
   const activeEditor: TextEditor = getActiveEditor();
   return activeEditor && sessions[path.basename(document.fileName)]
     ? true
@@ -72,4 +74,20 @@ export function isPositionAtEndOfLine(
 ): boolean {
   const otherPos: Position = document.lineAt(endPos.line).range.end;
   return endPos.isEqual(otherPos);
+}
+
+export function registerCommand(
+  cmdName: string,
+  callBack: () => void
+): Disposable {
+  return vscode.commands.registerCommand(cmdName, callBack);
+}
+
+export function makeTempFile(filename: string) {
+  var tmpobj = tmp.fileSync({
+    dir: path.dirname(filename),
+    prefix: "/.wolf",
+    postfix: ".py"
+  });
+  return tmpobj;
 }
