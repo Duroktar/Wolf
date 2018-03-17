@@ -80,6 +80,7 @@ Wolf is Good for:
 
 * Visual Studio Code
 * Python 3.5 - 3.6
+* Hunter - Available on pip (pip install hunter)
 
 ## Extension Settings
 
