@@ -87,8 +87,11 @@ def script_path(script_dir):
         and restoring it afterwards. This trick allows
         relative imports to work on the target script.
     """
+    original_cwd = os.getcwd()
+    os.chdir(script_dir)
     sys.path.insert(1, script_dir)
     yield
+    os.chdir(original_cwd)
     sys.path.remove(script_dir)
 
 
