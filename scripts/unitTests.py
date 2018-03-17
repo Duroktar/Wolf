@@ -6,7 +6,7 @@ import wolf
 from contextlib import redirect_stdout, contextmanager
 
 
-__dirname = os.path.dirname(__file__)
+__dirname = os.path.abspath(os.path.dirname(__file__))
 testDir = os.path.join(__dirname, 'testInputs')
 
 
