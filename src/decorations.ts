@@ -23,7 +23,11 @@ import {
 } from "./types";
 import { wolfTextColorProvider } from "./colors";
 import { wolfIconProvider } from "./icons";
-import { getActiveEditor, formatWolfResponseElement } from "./utils";
+import {
+  getActiveEditor,
+  formatWolfResponseElement,
+  stringEscape
+} from "./utils";
 const beautify = require("js-beautify").js;
 
 export function wolfDecorationStoreFactory(context: ExtensionContext) {
@@ -157,12 +161,11 @@ export class WolfDecorationsController {
       lineNo
     );
     const decoration = {
-      data: [...existing.data, annotation],
+      data: [...existing.data, stringEscape(annotation)],
       lineno: lineNo,
       error: line.error ? true : false,
       loop: line.hasOwnProperty("_loop"),
-      source: line.source,
-      pretty: [...existing.pretty, pretty]
+      pretty: [...existing.pretty, stringEscape(pretty)]
     } as WolfLineDecoration;
     this.setDecorationAtLine(lineNo, decoration);
   };
@@ -219,7 +222,7 @@ export class WolfDecorationsController {
       }
 
       const textLine: TextLine = editor.document.lineAt(lineIndex);
-      const source = decorationData.source;
+      const source = textLine.text;
       const decoRange = new Range(
         new Position(lineIndex, textLine.firstNonWhitespaceCharacterIndex),
         new Position(lineIndex, textLine.text.indexOf(source) + source.length)

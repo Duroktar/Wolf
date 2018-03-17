@@ -25,15 +25,12 @@ import os
 import sys
 import re
 import json
-import signal
 import traceback
 import io
 from copy import deepcopy
 from pprint import pformat
-from functools import wraps
 from importlib import util
 from contextlib import contextmanager
-from threading import Thread
 
 try:
     from hunter import trace
@@ -53,7 +50,7 @@ except ImportError:
 #
 # NOTE: See https://regex101.com/r/sf6nAH/15 for more info
 WOLF_MACROS = re.compile(
-    r"^(?!pass\s+|from\s+|import\s+|return\s+|continue\s+|if\s+|for\s+)((?P<variable>\w+)$|^(print\((?P<print>.+)\))|^(?P<macro_source>(?P<local>[^\d\W]+\s)*((?P<assignment>\=)?(?P<operator>\+\=|\-\=|\*\=|\\\=)* *)*(?P<macro>[\w\{\[\(].+)\#\s?\?[^\n]*))")
+    r"^(?!pass\s+|from\s+|import\s+|return\s+|continue\s+|if\s+|for\s+)((?P<variable>\w+)$|^(print\((?P<print>.+)\))|^(?P<macro_source>(?P<local>[^\d\W]+\s)*((?P<assignment>\=)?(?P<operator>\+\=|\-\=|\*\=|\\\=)* *)*(?P<macro>[\w\{\[\(\'\"].+)\#\s?\?[^\n]*))")
 
 # XXX: For parsing hunter.CodePrinter output see:
 # https://regex101.com/r/sf6nAH/2
@@ -240,7 +237,6 @@ def result_handler(event):
     # WOLF list.
     metadata = {
         "lineno":             event['lineno'],
-        "source":     event['source'].strip(),
         # "value"    <-  Defined below MAYBE..
     }
 
@@ -320,13 +316,10 @@ def result_handler(event):
                 # Make sure to display the output as a variable assignment
                 value = "{} = {}".format(local_name, value)
 
-            # This provides the entire source line for diffing during sticky updates
-            metadata['source'] = match.group('macro_source')
-
         # Final results are formatted
         metadata['value'] = resultifier(value)
 
-        if not skip and event.kind != 'return':
+        if not skip and event.kind not in ['return', 'call']:
             # And lastly, update our WOLF results list
             WOLF.append(metadata)
 
