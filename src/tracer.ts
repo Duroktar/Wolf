@@ -45,11 +45,11 @@ export class PythonTracer {
       clearTimeout(this.timeout)
     }
     const python = this.getPythonRunner(rootDir, fileName);
-    this.timeout = setTimeout(function(){ python.kill()}, 10 * 1000);
-    
+    this.timeout = setTimeout(function () { python.kill() }, 10 * 1000);
+
 
     python.stderr.on("data", (data: Buffer) => {
-      if (data.includes("IMPORT_ERROR")) {
+      if (data.includes("ImportError")) {
         onError(installHunter(afterInstall));
       } else {
         onError(data.toString());
