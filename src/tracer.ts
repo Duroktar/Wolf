@@ -2,8 +2,7 @@ import * as path from "path";
 import { installHunter } from "./hunterInstaller";
 import { WolfTracerInterface, WolfParsedTraceResults } from "./types";
 import { getActiveEditor, indexOrLast } from "./utils";
-
-const { spawn } = require("child_process");
+import { spawn } from "child_process"
 
 export function pythonTracerFactory() {
   return new PythonTracer();
@@ -12,18 +11,20 @@ export function pythonTracerFactory() {
 export class PythonTracer {
   private timeout = null;
 
-  private getPythonRunner(rootDir: string, scriptName: string) {
+  private getPythonRunner(pythonPath: string, rootDir: string, scriptName: string) {
     const wolfPath: string = path.join(rootDir, "scripts/wolf.py");
-    return spawn("python", [wolfPath, scriptName]);
+    return spawn(pythonPath, [wolfPath, scriptName]);
   }
 
   public tracePythonScriptForActiveEditor({
+    pythonPath,
     rootDir,
     afterInstall,
     onData,
     onError
   }: WolfTracerInterface) {
     return this.tracePythonScriptForDocument({
+      pythonPath,
       fileName: getActiveEditor().document.fileName,
       rootDir,
       afterInstall,
@@ -33,6 +34,7 @@ export class PythonTracer {
   }
 
   public tracePythonScriptForDocument({
+    pythonPath,
     fileName,
     rootDir,
     afterInstall,
@@ -44,14 +46,13 @@ export class PythonTracer {
     if (this.timeout !== null) {
       clearTimeout(this.timeout)
     }
-    const python = this.getPythonRunner(rootDir, fileName);
+    const python = this.getPythonRunner(pythonPath, rootDir, fileName);
     this.timeout = setTimeout(function () { python.kill() }, 10 * 1000);
-
 
     python.stderr.on("data", (data: Buffer) => {
       if (data.includes("ImportError")) {
         console.log(data.toString())
-        onError(installHunter(afterInstall));
+        onError(installHunter(pythonPath, afterInstall));
       } else {
         onError(data.toString());
       }
