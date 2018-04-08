@@ -50,6 +50,7 @@ export class PythonTracer {
 
     python.stderr.on("data", (data: Buffer) => {
       if (data.includes("ImportError")) {
+        console.log(data.toString())
         onError(installHunter(afterInstall));
       } else {
         onError(data.toString());
