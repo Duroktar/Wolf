@@ -152,6 +152,14 @@ You can't get any better than _live feedback next to the code you're editing_!
 
 ## **Changelog**
 
+## v0.3.10 ~ Patch
+
+Fixed hunter installation and added setting for python path (Fixes contributed by @[Almenon](https://github.com/Almenon)). This should
+fix any remaining `'Hunter not found'` errors. The Python Path
+setting makes it easy to point your Wolf session at another Python
+installation if you don't want to have to install Hunter into your
+working env.
+
 ## v0.3.0 ~ Minor Release
 
 ### No Config Setup
@@ -359,7 +367,7 @@ on your own, if you just want to do that. Welcome one, welcome all!
 
 The following people have contributed to Wolf:
 
-[Almenon](https://github.com/Almenon) - Windows fix and Python 3.5 support and tests, as well as various other fixes and improvements ~ [#3](https://github.com/Duroktar/Wolf/pull/3) [#6](https://github.com/Duroktar/Wolf/pull/6)
+[Almenon](https://github.com/Almenon) - Windows fixes, Python 3.5 support, tests & many more fixes and improvements ~ [#3](https://github.com/Duroktar/Wolf/pull/3) [#6](https://github.com/Duroktar/Wolf/pull/6) [#13](https://github.com/Duroktar/Wolf/pull/13)
 
 ## License
 

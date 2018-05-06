@@ -12,9 +12,7 @@
       "cwd": "${workspaceFolder}",
       "env": {},
       "envFile": "${workspaceFolder}/.env",
-      "debugOptions": [
-        "RedirectOutput"
-      ]
+      "debugOptions": ["RedirectOutput"]
     },
     {
       "name": "wolf.py Debug Session Windows",
@@ -29,12 +27,8 @@
         "WOLF_DEBUG_SESSION": true
       },
       "envFile": "${workspaceFolder}/.env",
-      "debugOptions": [
-        "RedirectOutput"
-      ],
-      "args": [
-        "${workspaceFolder}/scripts/test.py"
-      ]
+      "debugOptions": ["RedirectOutput"],
+      "args": ["${workspaceFolder}/scripts/test.py"]
     },
     {
       "name": "wolf.py Debug Session Linux/OSX",
@@ -49,27 +43,18 @@
         "WOLF_DEBUG_SESSION": true
       },
       "envFile": "${workspaceFolder}/.env",
-      "debugOptions": [
-        "RedirectOutput"
-      ],
-      "args": [
-        "${workspaceFolder}/scripts/test.py"
-      ]
+      "debugOptions": ["RedirectOutput"],
+      "args": ["${workspaceFolder}/scripts/test.py"]
     },
     {
       "name": "Launch Extension",
       "type": "extensionHost",
       "request": "launch",
       "runtimeExecutable": "${execPath}",
-      "args": [
-        "--extensionDevelopmentPath=${workspaceRoot}"
-      ],
+      "args": ["--extensionDevelopmentPath=${workspaceRoot}"],
       "stopOnEntry": false,
       "sourceMaps": true,
-      "outFiles": [
-        "${workspaceRoot}/out/src/**/*.js"
-      ],
-      "preLaunchTask": "npm"
+      "outFiles": ["${workspaceRoot}/out/src/**/*.js"]
     },
     {
       "name": "Launch Tests",
@@ -82,10 +67,7 @@
       ],
       "stopOnEntry": false,
       "sourceMaps": true,
-      "outFiles": [
-        "${workspaceRoot}/out/test/**/*.js"
-      ],
-      "preLaunchTask": "npm"
+      "outFiles": ["${workspaceRoot}/out/test/**/*.js"]
     },
     {
       "type": "node",
@@ -94,9 +76,7 @@
       "protocol": "inspector",
       "port": 5870,
       "restart": true,
-      "outFiles": [
-        "${workspaceRoot}/out/src"
-      ]
+      "outFiles": ["${workspaceRoot}/out/src"]
     }
   ]
 }
