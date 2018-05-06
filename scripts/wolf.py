@@ -32,11 +32,7 @@ from pprint import pformat
 from importlib import util
 from contextlib import contextmanager
 
-try:
-    from hunter import trace
-except ImportError:
-    print('IMPORT_ERROR: Error importing Hunter', file=sys.stderr)
-    exit(1)
+from hunter import trace
 
 
 ###################

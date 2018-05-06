@@ -53,7 +53,7 @@ export class WolfAPI {
     private _sessionController: WolfSessionController,
     private _stickyController: WolfStickyController,
     private _pythonTracer: PythonTracer
-  ) {}
+  ) { }
 
   public stepInWolf = (): void => {
     this.decorations.setDefaultDecorationOptions("green", "red");
@@ -126,6 +126,7 @@ export class WolfAPI {
     this.decorations.reInitDecorationCollection();
     fs.writeFileSync(tempFileObj.name, newSource);
     this.tracer.tracePythonScriptForDocument({
+      pythonPath: this.pythonPath,
       fileName: tempFileObj.name,
       rootDir: this.rootExtensionDir,
       afterInstall: this.traceOrRenderPreparedDecorations, // Recurse if Hunter had to be installed first,
@@ -152,7 +153,7 @@ export class WolfAPI {
     return data.map(
       l =>
         `LINENO: ${l.lineno} - VALUE: ${l.value}${
-          l.error ? `, ERROR: ${l.error}` : ""
+        l.error ? `, ERROR: ${l.error}` : ""
         }`
     );
   }
@@ -227,6 +228,7 @@ export class WolfAPI {
   private traceAndRenderDecorationsForActiveSession = (): void => {
     this.decorations.reInitDecorationCollection();
     this.tracer.tracePythonScriptForActiveEditor({
+      pythonPath: this.pythonPath,
       rootDir: this.rootExtensionDir,
       afterInstall: this.traceOrRenderPreparedDecorations, // Recurse if Hunter had to be installed first,
       onData: this.onPythonDataSuccess,
@@ -280,11 +282,11 @@ export class WolfAPI {
   }
 
   public get isHot() {
-    return this.config.get("hot");
+    return this.config.get<boolean>("hot");
   }
 
   public get updateFrequency() {
-    return parseInt(this.config.get("updateFrequency"));
+    return this.config.get<number>("updateFrequency");
   }
 
   public get oldLineCount() {
@@ -296,7 +298,7 @@ export class WolfAPI {
   }
 
   public get printLogging() {
-    return this.config.get("printLoggingEnabled");
+    return this.config.get<boolean>("printLoggingEnabled");
   }
 
   public get rootExtensionDir() {
@@ -321,5 +323,9 @@ export class WolfAPI {
 
   public get tracer() {
     return this._pythonTracer;
+  }
+
+  public get pythonPath() {
+    return this.config.get<string>("pythonPath")
   }
 }

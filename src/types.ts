@@ -24,7 +24,7 @@ export interface WolfGutterDecorationOptions {
 
 export type WolfValue = string | number;
 
-export interface WolfResponse {}
+export interface WolfResponse { }
 
 export interface WolfLineDecoration {
   data: WolfValue[];
@@ -72,6 +72,7 @@ export interface WolfTraceLineResult {
 export type WolfParsedTraceResults = WolfTraceLineResult[] | null;
 
 export interface WolfTracerInterface {
+  pythonPath: string;
   fileName: string;
   rootDir: string;
   afterInstall: () => void;

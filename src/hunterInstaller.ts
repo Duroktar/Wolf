@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 
 const { spawn } = require("child_process");
 
-export function installHunter(postInstallHook: () => void) {
+export function installHunter(pythonPath, postInstallHook: () => void) {
   // This means the 'hunter' package is not installed .. Notify
   // and offer to install for user automatically.
   const installHunter: vscode.MessageItem = { title: "Install Package" };
@@ -13,7 +13,7 @@ export function installHunter(postInstallHook: () => void) {
     )
     .then(result => {
       if (result === installHunter) {
-        const child = spawn("pip", ["install", "hunter", "--user"]);
+        const child = spawn(pythonPath, ["-m", "pip", "install", "hunter", "--user"]);
         child.stderr.on("data", data => {
           console.error("INSTALL_ERROR:", data + "");
         });
