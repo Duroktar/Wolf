@@ -1,7 +1,8 @@
-import json
+# import sys
+# import os
+# import json
 
-x = json.loads('{x:5}')
-
+# x = json.loads('{"x":5}')
 
 # inputs = [
 #     [6.4, 2.8, 5.6, 2.2, 3],
@@ -10,10 +11,6 @@ x = json.loads('{x:5}')
 #     [4.9, 3.1, 1.5, 0.1, 0],
 #     [5.7, 3.8, 1.7, 0.3, 0]
 # ]
-
-# import sys
-# import os
-
 
 # features = [x[0:-1] for x in inputs]  # ?
 # labels = [x[-1] for x in inputs]  # ?
@@ -87,11 +84,9 @@ x = json.loads('{x:5}')
 # # # Tries to avoid side effects whrnever posible
 
 
-# def fat():
-#     return
+1 + 334  # ?
 
-
-# 1 + 334  # ?  Calculator  ->
+1 < 0
 
 # b  # Commented lines are ignored
 # b  # ?
