@@ -1,7 +1,7 @@
 {
   "name": "Wolf",
   "author": "Scott Doucet",
-  "version": "0.3.9",
+  "version": "0.3.11",
   "scripts": {
     "test": "pytest",
     "test:snapshot-update": "pytest --snapshot-update",
