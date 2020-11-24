@@ -177,15 +177,18 @@ def resultifier(value):
         return str(value)
 
 
-def wolf_prints():
+def wolf_formats():
     # It's important that we create an output that can be handled
     # by the javascript `JSON.parse(...)` function.
     results = (json.dumps(i) for i in WOLF if contains_any(
         'value', i.keys()) or i['error'])
     python_data = ", ".join(results)
 
+    return "[" + python_data + "]"
+
+def wolf_prints():
     # DO NOT TOUCH, ie: no pretty printing
-    print("WOOF: [" + python_data + "]")  # <--  Wolf result
+    print("WOOF: " + wolf_formats())  # <--  Wolf result
     ######################################
 
 
@@ -197,12 +200,14 @@ def parse_eval(*args, **kw):
         rv = eval(*args)
     except Exception as e:
         if event['kind'] == 'line':
-            value = traceback.format_exception_only(type(e), e)[0]
+            thrown = traceback.format_exception_only(type(e), e)
+            error = '\n'.join(thrown)
+            source = event['source'].strip()
             metadata = {
                 "lineno":              event['lineno'],
-                "source":      event['source'].strip(),
-                "value":                         value,
-                "error":                          True,
+                "source":                       source,
+                "value":                     thrown[0],
+                "error":                         error,
             }
 
             WOLF.append(metadata)
@@ -350,8 +355,25 @@ def import_and_trace_script(module_name, module_path):
         with trace(filename_filter(module_path), action=result_handler):
             import_file(module_name, module_path)
 
+def test(snippet):
+    """
+        TODO
+    """
+    from tempfile import mkstemp
 
-def main(filename):
+    testdir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tests')
+    tmpfile_path = mkstemp(suffix=".py", text=True)[1]
+    full_path = os.path.abspath(tmpfile_path)
+    tmpfile_name = os.path.basename(tmpfile_path).split('.')[0]
+    filename = os.path.basename(tmpfile_path)
+
+    with open(full_path, 'a') as the_file:
+        the_file.write(snippet.strip() + '\n')
+
+    return main(full_path, test=True) 
+
+
+def main(filename, test = False):
     """
         Simply ensures the target script exists and calls
         the import_and_trace_script function. The results
@@ -449,6 +471,13 @@ def main(filename):
 
         # And tack the error on to the end of the response.
         WOLF.append(metadata)
+
+    # handle testing
+    if test:
+        os.remove(full_path)
+        res = wolf_formats()
+        WOLF.clear()
+        return res 
 
     # print the results and return a 0 for the exit code
     wolf_prints()
