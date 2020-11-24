@@ -1,10 +1,10 @@
-import { TextDocumentChangeEvent, TextDocument, TextEditor } from "vscode";
-import { annotatedLineIsChanged, getActiveEditor } from "./utils";
+import { TextDocumentChangeEvent } from "vscode";
+import { annotatedLineIsChanged, getActiveEditor } from "./helpers";
 import { WolfDecorationsController } from "./decorations";
 
 export function wolfStickyControllerFactory(
   decorationController: WolfDecorationsController
-) {
+): WolfStickyController {
   return new WolfStickyController(decorationController);
 }
 
@@ -15,8 +15,8 @@ export class WolfStickyController {
     event: TextDocumentChangeEvent,
     oldLineCount: number
   ): void => {
-    const activeEditor: TextEditor = getActiveEditor();
-    const activeDocument: TextDocument = activeEditor.document;
+    const activeEditor = getActiveEditor();
+    const activeDocument = activeEditor.document;
     const diff = event.document.lineCount - oldLineCount;
     const decorations = this.decorationController.getAllDecorations();
     if (event.contentChanges.length === 1) {

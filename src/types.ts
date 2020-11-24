@@ -22,17 +22,15 @@ export interface WolfGutterDecorationOptions {
   leftMargin?: number;
 }
 
-export type WolfValue = string | number;
-
-export interface WolfResponse { }
+export type WolfResponse = Record<string, string>
 
 export interface WolfLineDecoration {
-  data: WolfValue[];
+  data: string[];
   lineno: number;
   error: boolean;
   loop: boolean;
   source: string;
-  pretty: WolfValue[];
+  pretty: string[];
   calls: number;
 }
 
@@ -48,6 +46,13 @@ export interface WolfDecorationOptions {
   language?: "python" | string;
 }
 
+export interface WolfDecorationMoveOptions {
+  start: number;
+  end?: number;
+  swap?: boolean;
+  step?: number;
+}
+
 export interface WolfStandardDecorationTypes {
   success: TextEditorDecorationType;
   error: TextEditorDecorationType;
@@ -60,7 +65,7 @@ export interface WolfSessionDecorations {
 
 export interface WolfTraceLineResult {
   lineno: number;
-  value: WolfValue;
+  value: string;
   kind: string;
   source: string;
   pretty: string;
@@ -76,8 +81,8 @@ export interface WolfTracerInterface {
   fileName: string;
   rootDir: string;
   afterInstall: () => void;
-  onData: (WolfParsedTraceResults) => void;
-  onError: (string) => void;
+  onData: (WolfParsedTraceResults: WolfTraceLineResult[] | undefined) => void;
+  onError: (message?: string) => void;
 }
 
 export type ActiveTextEditorChangeEventResult = TextEditor | undefined;

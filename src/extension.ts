@@ -7,9 +7,10 @@ import {
 
 import { wolfStandardApiFactory, WolfAPI } from "./api";
 import { ActiveTextEditorChangeEventResult } from "./types";
-import { clamp, registerCommand } from "./utils";
+import { registerCommand } from "./helpers";
+import { clamp } from "./utils";
 
-export function activate(context: ExtensionContext) {
+export function activate(context: ExtensionContext): void {
   const output: OutputChannel = vscode.window.createOutputChannel("Wolf");
   const wolfAPI: WolfAPI = wolfStandardApiFactory(context, { output });
 
@@ -23,10 +24,10 @@ export function activate(context: ExtensionContext) {
       registerCommand("wolf.stopBarking", stopWolf)
     );
 
-    const opts = [null, context.subscriptions];
-    vscode.window.onDidChangeActiveTextEditor(changedActiveTextEditor, ...opts);
-    vscode.workspace.onDidChangeTextDocument(changedTextDocument, ...opts);
-    vscode.workspace.onDidChangeConfiguration(changedConfiguration, ...opts);
+    const sharedOptions = [null, context.subscriptions];
+    vscode.window.onDidChangeActiveTextEditor(changedActiveTextEditor, ...sharedOptions);
+    vscode.workspace.onDidChangeTextDocument(changedTextDocument, ...sharedOptions);
+    vscode.workspace.onDidChangeConfiguration(changedConfiguration, ...sharedOptions);
   }
 
   function startWolf(): void {
@@ -77,7 +78,7 @@ export function activate(context: ExtensionContext) {
     }
   }
 
-  function changedConfiguration(event): void {
+  function changedConfiguration(event: vscode.ConfigurationChangeEvent): void {
     if (
       event.affectsConfiguration("wolf.pawPrintsInGutter") ||
       event.affectsConfiguration("wolf.updateFrequency") ||
@@ -87,7 +88,7 @@ export function activate(context: ExtensionContext) {
     }
   }
 
-  let updateTimeout = null;
+  let updateTimeout: null | NodeJS.Timeout = null;
 
   function cancelPending(): void {
     [updateTimeout].forEach(pending => {
@@ -103,7 +104,7 @@ export function activate(context: ExtensionContext) {
     }
     updateTimeout = setTimeout(
       () => wolfAPI.handleDidChangeTextDocument(event.document),
-      clamp(100, 10000, wolfAPI.updateFrequency)
+      clamp(100, 10000, wolfAPI.updateFrequency ?? Infinity)
     );
   }
 }

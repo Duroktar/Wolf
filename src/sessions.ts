@@ -1,8 +1,8 @@
 import { TextEditor, TextDocument } from "vscode";
 import { WolfActiveSessionCollection } from "./types";
-import { getActiveEditor } from "./utils";
+import { getActiveEditor } from "./helpers";
 
-export function wolfSessionStoreFactory() {
+export function wolfSessionStoreFactory(): WolfSessionController {
   return new WolfSessionController();
 }
 
@@ -13,7 +13,7 @@ export class WolfSessionController {
     this._sessions = {} as WolfActiveSessionCollection;
   }
 
-  public clearSessionByName(name): void {
+  public clearSessionByName(name: string): void {
     delete this._sessions[name];
   }
 
@@ -21,8 +21,8 @@ export class WolfSessionController {
     this._sessions[editor.document.fileName] = editor;
   }
 
-  public getActiveSession() {
-    const activeEditor: TextEditor = getActiveEditor();
+  public getActiveSession(): TextEditor {
+    const activeEditor = getActiveEditor();
     return this._sessions[activeEditor.document.fileName];
   }
 

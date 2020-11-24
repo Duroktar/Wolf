@@ -1,6 +1,6 @@
 import { MessageItem, WorkspaceConfiguration, window, workspace } from "vscode";
 
-export function hotModeWarning() {
+export function hotModeWarning(): void {
   const config: WorkspaceConfiguration = workspace.getConfiguration("wolf");
   const disableWarnings: MessageItem = { title: "Don't ask again" };
 

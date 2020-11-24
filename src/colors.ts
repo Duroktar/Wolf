@@ -20,10 +20,10 @@ const WolfHexColorMap = {
   red: "#ea2f36"
 } as WolfHexColorType;
 
-export function wolfIconColorProvider(color: WolfColorSelection) {
-  return WolfIconColorMap[color] as WolfIconColor;
+export function wolfIconColorProvider(color: WolfColorSelection): WolfIconColor {
+  return WolfIconColorMap[color];
 }
 
-export function wolfTextColorProvider(color: WolfColorSelection) {
-  return WolfHexColorMap[color] as WolfHexColor;
+export function wolfTextColorProvider(color: WolfColorSelection): WolfHexColor {
+  return WolfHexColorMap[color];
 }

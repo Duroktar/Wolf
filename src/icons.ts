@@ -1,4 +1,4 @@
-import { WolfColorSelection, WolfIcon, WolfIconColor } from "./types";
+import { WolfColorSelection, WolfIcon } from "./types";
 import { ExtensionContext } from "vscode";
 import { wolfIconColorProvider } from "./colors";
 
@@ -7,7 +7,7 @@ export function wolfIconProvider(
   color: WolfColorSelection,
   pawprints: boolean
 ): WolfIcon {
-  const iconColor: WolfIconColor = wolfIconColorProvider(color);
+  const iconColor = wolfIconColorProvider(color);
   return context
     .asAbsolutePath(`media\\wolf${pawprints ? "-paw" : ""}-${iconColor}.png`)
     .replace(/\\/g, "/");

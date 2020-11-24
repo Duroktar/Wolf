@@ -1,6 +1,6 @@
 import { OutputChannel } from "vscode";
 
-export function wolfOutputFactory(channel: OutputChannel) {
+export function wolfOutputFactory(channel: OutputChannel): WolfOutputController {
   return new WolfOutputController(channel);
 }
 
