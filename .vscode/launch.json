@@ -1,82 +1,78 @@
 // A launch configuration that compiles the extension and then opens it inside a new window
 {
-  "version": "0.1.0",
+  "version": "0.2.0",
   "configurations": [
     {
       "name": "Python: Current File",
       "type": "python",
       "request": "launch",
       "stopOnEntry": true,
-      "pythonPath": "${config:python.pythonPath}",
+      "python": "${command:python.interpreterPath}",
       "program": "${file}",
       "cwd": "${workspaceFolder}",
       "env": {},
       "envFile": "${workspaceFolder}/.env",
-      "debugOptions": ["RedirectOutput"]
     },
     {
       "name": "wolf.py Debug Session Windows",
       "type": "python",
       "request": "launch",
       "stopOnEntry": true,
-      "pythonPath": "${config:python.pythonPath}",
+      "python": "${command:python.interpreterPath}",
       "program": "${workspaceFolder}/\\scripts/\\wolf.py",
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "env": {
-        "WOLF_DEBUG_SESSION": true
+        "WOLF_DEBUG_SESSION": "true"
       },
       "envFile": "${workspaceFolder}/.env",
-      "debugOptions": ["RedirectOutput"],
-      "args": ["${workspaceFolder}/scripts/test.py"]
+      "args": [
+        "${workspaceFolder}/scripts/test.py"
+      ]
     },
     {
       "name": "wolf.py Debug Session Linux/OSX",
       "type": "python",
       "request": "launch",
       "stopOnEntry": true,
-      "pythonPath": "${config:python.pythonPath}",
+      "python": "${command:python.interpreterPath}",
       "program": "${workspaceFolder}/scripts/wolf.py",
       "cwd": "${workspaceFolder}",
       "console": "integratedTerminal",
       "env": {
-        "WOLF_DEBUG_SESSION": true
+        "WOLF_DEBUG_SESSION": "true"
       },
       "envFile": "${workspaceFolder}/.env",
-      "debugOptions": ["RedirectOutput"],
-      "args": ["${workspaceFolder}/scripts/test.py"]
+      "args": [
+        "${workspaceFolder}/scripts/test.py"
+      ]
     },
     {
       "name": "Launch Extension",
       "type": "extensionHost",
       "request": "launch",
       "runtimeExecutable": "${execPath}",
-      "args": ["--extensionDevelopmentPath=${workspaceRoot}"],
-      "stopOnEntry": false,
-      "sourceMaps": true,
-      "outFiles": ["${workspaceRoot}/out/src/**/*.js"]
+      "args": [
+        "--extensionDevelopmentPath=${workspaceRoot}"
+      ],
+      "outFiles": [
+        "${workspaceRoot}/out/**/*.js"
+      ],
+      "preLaunchTask": "${defaultBuildTask}"
     },
     {
-      "name": "Launch Tests",
+      "name": "Extension Tests",
       "type": "extensionHost",
       "request": "launch",
       "runtimeExecutable": "${execPath}",
       "args": [
-        "--extensionDevelopmentPath=${workspaceRoot}",
-        "--extensionTestsPath=${workspaceRoot}/out/test"
+        "--disable-extensions",
+        "--extensionDevelopmentPath=${workspaceFolder}",
+        "--extensionTestsPath=${workspaceFolder}/out/test/suite/index"
       ],
-      "stopOnEntry": false,
-      "sourceMaps": true,
-      "outFiles": ["${workspaceRoot}/out/test/**/*.js"]
-    },
-    {
-      "type": "node",
-      "request": "attach",
-      "name": "Attach to Extension Host",
-      "protocol": "inspector",
-      "port": 5870,
-      "restart": true,
-      "outFiles": ["${workspaceRoot}/out/src"]
+      "outFiles": [
+        "${workspaceFolder}/out/test/**/*.js"
+      ]
     }
   ]
 }

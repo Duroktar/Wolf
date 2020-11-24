@@ -3,13 +3,17 @@
   "author": "Scott Doucet",
   "version": "0.3.9",
   "scripts": {
-    "test": "python scripts/wolf.py scripts/test.py",
-    "test:unittests": "python scripts/unitTests.py"
+    "test": "pytest",
+    "test:snapshot-update": "pytest --snapshot-update",
+    "test:watch": "pytest-watch --ignore=scripts/tests/snapshots/"
   },
   "dev_dependencies": {
     "autopep8": "~=1.3.4",
     "flake8": "~=3.5.0",
+    "hunter": "~=3.3.1",
+    "pytest-watch": "~=4.2.0",
+    "pytest": "~=6.1.2",
     "rope": "~=0.10.7",
-    "hunter": "~=2.0.2"
+    "snapshottest": "~=0.6.0"
   }
 }
