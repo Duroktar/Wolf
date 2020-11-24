@@ -21,6 +21,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 """
+import ast
 import os
 import sys
 import re
@@ -167,14 +168,13 @@ def resultifier(value):
     #       <function add at 0x7f768395ad95>
     #
     #########
+    if isinstance(value, bool):
+        return str(value)
     if callable(value):
         return repr(value)
-    elif value is None:
+    if value is None:
         return 'None'
-    elif isinstance(value, int):
-        return value
-    else:
-        return str(value)
+    return str(value)
 
 
 def wolf_formats():
@@ -264,7 +264,11 @@ def result_handler(event):
     skip = False
 
     # Regex match groups are used for convenience.
-    if match:
+    if source not in ['pass', 'break', 'continue'] and match: # fixes https://github.com/Duroktar/Wolf/issues/28 to 30
+
+        # TODO: We should be using the ast instead of regex for all cases.
+        tree = ast.parse(source)
+        src_seg = ast.get_source_segment(source, tree.body[0])
 
         # Simplest case.
         if match.group('variable'):
@@ -276,49 +280,55 @@ def result_handler(event):
                 skip = True
 
         # A little magic to parse print args
-        if match.group('print'):
+        elif match.group('print'):
             buffer = io.StringIO()
             try:
-                to_eval = "print({}, file=wolf__buffer__)".format(
-                    match.group('print'))
+                to_eval = "print({}, file=wolf__buffer__)".format(src_seg[6:-1]) # fixes https://github.com/Duroktar/Wolf/issues/34
                 exec(to_eval, _globals, {**_locals, 'wolf__buffer__': buffer})
                 value = str(buffer.getvalue()).strip('\n')
             finally:
                 buffer.close()
 
         # Macros require a few more steps..
-        if match.group('macro'):
+        elif match.group('macro'):
 
             # XXX: This is to help avoid side effects when evaluating expressions
             m_locals_copy = {k: try_deepcopy(v) for k, v in _locals.items()}
             m_globals_copy = {k: try_deepcopy(v) for k, v in _globals.items()}
 
-            # Basic macro to evaluate
-            value = parse_eval(match.group('macro').strip(),
-                               m_globals_copy, m_locals_copy, event=event)
+            if isinstance(tree.body[0], ast.Assign):
+                node = tree.body[0]
 
-            # Value is being assigned to a variable (local)
-            if match.group('local'):
+                if hasattr(node, 'target'):
+                    target = node.target
+                else:
+                    target = node.targets[0]
+
                 # Get the variable name
-                local_name = match.group('local').strip()
+                local_name = target.id
 
-                if match.group('operator') or match.group('assignment'):
-                    if event.function == '<listcomp>':
-                        skip = True
-
-                # This is for += -= *= and /= assignments
-                if match.group('operator'):
+                if isinstance(tree.body[0], ast.AugAssign):
+                    operator = {'Mult': '*=', 'Add': '+=', 'Sub': '-=', 'Div': '/='}[node.op]
 
                     # This get the value of the local variable from earlier
-                    left_side_value = parse_eval(local_name,
-                                                 m_globals_copy, m_locals_copy, event=event)
+                    left_side_value = parse_eval(local_name, m_globals_copy, m_locals_copy, event=event)
 
                     # This evaluates the statement with the infixed operator
-                    value = parse_eval("{} {} {}".format(left_side_value,
-                                                         match.group('operator').strip()[0], value), event=event)
+                    value = parse_eval("{} {} {}".format(left_side_value, operator, value), event=event)
+                else:
+                    print(src_seg[src_seg.index('=')+1:].strip())
+                    # Basic macro to evaluate
+                    value = parse_eval(src_seg[src_seg.index('=')+1:].strip(), m_globals_copy, m_locals_copy, event=event)
 
                 # Make sure to display the output as a variable assignment
                 value = "{} = {}".format(local_name, value)
+
+            else:
+                # Basic macro evaluation
+                value = parse_eval(match.group('macro').strip(), m_globals_copy, m_locals_copy, event=event)
+        else:
+            # Basic macro evaluation
+            value = parse_eval(src_seg, m_globals_copy, m_locals_copy, event=event)
 
         # Final results are formatted
         metadata['value'] = resultifier(value)
