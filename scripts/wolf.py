@@ -1,4 +1,4 @@
-""" Wolf - It kicks the Quokkas ass.
+r""" Wolf - It kicks the Quokkas ass.
       .-"-.
      / /|  \                     _  __
     | <'/   |                   | |/ _|
