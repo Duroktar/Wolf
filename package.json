@@ -134,7 +134,7 @@
     "vscode:prepublish": "yarn run compile",
     "compile": "tsc -p ./",
     "lint": "eslint src --ext ts",
-    "pretest": "npm run compile",
+    "pretest": "yarn run compile",
     "test": "node ./out/test/runTest.js",
     "watch": "tsc -watch -p ./",
     "ext:package": "vsce package",
