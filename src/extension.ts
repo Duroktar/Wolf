@@ -10,11 +10,14 @@ import { ActiveTextEditorChangeEventResult } from "./types";
 import { registerCommand } from "./helpers";
 import { clamp } from "./utils";
 
-export function activate(context: ExtensionContext): void {
+export function activate(context: ExtensionContext): WolfAPI {
   const output: OutputChannel = vscode.window.createOutputChannel("Wolf");
   const wolfAPI: WolfAPI = wolfStandardApiFactory(context, { output });
+  let updateTimeout: null | NodeJS.Timeout = null;
 
   initializeWolfExtension();
+
+  return wolfAPI;
 
   function initializeWolfExtension(): void {
     context.subscriptions.push(
@@ -87,8 +90,6 @@ export function activate(context: ExtensionContext): void {
       wolfAPI.setConfigUpdatedFlag(true);
     }
   }
-
-  let updateTimeout: null | NodeJS.Timeout = null;
 
   function cancelPending(): void {
     [updateTimeout].forEach(pending => {

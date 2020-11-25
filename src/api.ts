@@ -25,6 +25,7 @@ import { PythonTracer, pythonTracerFactory } from "./tracer";
 import { getActiveEditor, makeTempFile } from "./helpers";
 import { hotModeWarning } from "./hotWarning";
 import { wolfOutputFactory, WolfOutputController } from "./output";
+import { EventEmitter } from "events";
 
 export function wolfStandardApiFactory(
   context: ExtensionContext,
@@ -43,6 +44,8 @@ export function wolfStandardApiFactory(
   );
 }
 
+type WolfEvent = 'decorations-changed';
+
 export class WolfAPI {
   public _changedConfigFlag = false;
   private _endOfFile = 0;
@@ -54,6 +57,16 @@ export class WolfAPI {
     private _stickyController: WolfStickyController,
     private _pythonTracer: PythonTracer
   ) { }
+
+  private events = new EventEmitter()
+
+  public emit = (event: WolfEvent, filepath: string, ...args: unknown[]): void => {
+    this.events.emit(event, filepath, ...args)
+  }
+
+  public on = (event: WolfEvent, listener: (...args: unknown[]) => void): void => {
+    this.events.addListener(event, listener)
+  }
 
   public stepInWolf = (): void => {
     this.decorations.setDefaultDecorationOptions("green", "red");
@@ -146,6 +159,7 @@ export class WolfAPI {
       this.logToOutput("(Wolf Output):", JSON.stringify(prettyWolf, null, 4));
       this.logToOutput(`\n\nTotal Line Count: ${data?.length}`);
     }
+    this.emit('decorations-changed', this.activeEditor.document.uri.path, this.decorations)
   };
 
   private onPythonDataError = (data?: string): void => {
