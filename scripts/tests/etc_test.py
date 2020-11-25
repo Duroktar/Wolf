@@ -5,8 +5,6 @@ snippet = r"""
 tup = (1, 2, 3)  # ?
 tup
 
-1 + 334  # ?  Comments  ->
-
 1 < 0  # ?
 
 text = 'happy'  # ?
