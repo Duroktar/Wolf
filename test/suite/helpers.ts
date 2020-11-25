@@ -1,3 +1,4 @@
+import { resolve } from 'path';
 import * as vscode from 'vscode';
 
 export async function createTextDocument(content: string, language?: string): Promise<vscode.TextDocument> {
@@ -9,7 +10,7 @@ export function setActiveTextEditor(editor: vscode.TextEditor): void {
 }
 
 export async function openAndShowTextDocument(filepath: string): Promise<vscode.TextEditor> {
-  const uri = vscode.Uri.parse(filepath);
+  const uri = vscode.Uri.parse(resolve(filepath));
   console.log('filepath:', filepath)
   console.log('uri:', uri)
   const document = await vscode.workspace.openTextDocument(uri);
