@@ -20,7 +20,6 @@ suite("Extension Tests", () => {
 
     assert.strictEqual(api.decorations.hasDecoratons, false, 'Decorations present too early');
 
-    api.config.update('disableHotModeWarning', true)
     return new Promise(resolve => {
       api.on('decorations-changed', () => {
         assert.strictEqual(api.decorations.hasDecoratons, true, 'No decorations')
