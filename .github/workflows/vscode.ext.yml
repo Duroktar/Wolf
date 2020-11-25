@@ -16,6 +16,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
+        python-version: [3.5]
     runs-on: ${{ matrix.os }}
     steps:
     - name: Checkout
@@ -26,6 +27,10 @@ jobs:
         node-version: 10.x
     - name: Install NodeJS Dependencies
       run: yarn install
+    - name: Install Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
     - run: xvfb-run -a npm test
       if: runner.os == 'Linux'
     - run: npm test
