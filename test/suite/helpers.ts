@@ -10,6 +10,8 @@ export function setActiveTextEditor(editor: vscode.TextEditor): void {
 
 export async function openAndShowTextDocument(filepath: string): Promise<vscode.TextEditor> {
   const uri = vscode.Uri.parse(filepath);
+  console.log('filepath:', filepath)
+  console.log('uri:', uri)
   const document = await vscode.workspace.openTextDocument(uri);
   return await vscode.window.showTextDocument(document, { preview: false });
 }
