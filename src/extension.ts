@@ -37,14 +37,16 @@ export function activate(context: ExtensionContext): WolfAPI {
     if (wolfAPI.shouldShowHotModeWarning) {
       wolfAPI.displayHotModeWarning();
     }
+
     wolfAPI.stepInWolf();
 
-    forceRefreshDocument(wolfAPI);
+    if (wolfAPI.activeEditorIsDirty)
+      forceRefreshActiveDocument(wolfAPI);
   }
 
   function stopWolf(): void {
     wolfAPI.stopWolf();
-    cancelPending();
+    clearThrottleUpdateBuffer();
   }
 
   function changedActiveTextEditor(
@@ -62,9 +64,7 @@ export function activate(context: ExtensionContext): WolfAPI {
           wolfAPI.stepInWolf();
         } else {
           wolfAPI.enterWolfContext();
-          throttledHandleDidChangeTextDocument({
-            document: editor.document
-          } as TextDocumentChangeEvent);
+          forceRefreshActiveDocument(wolfAPI);
         }
       } else {
         wolfAPI.exitWolfContext();
@@ -88,7 +88,7 @@ export function activate(context: ExtensionContext): WolfAPI {
     }
   }
 
-  function cancelPending(): void {
+  function clearThrottleUpdateBuffer(): void {
     if (updateTimeout) {
       clearTimeout(updateTimeout);
     }
@@ -97,24 +97,16 @@ export function activate(context: ExtensionContext): WolfAPI {
   function throttledHandleDidChangeTextDocument(
     event: TextDocumentChangeEvent
   ): void {
-    cancelPending()
+    clearThrottleUpdateBuffer()
     updateTimeout = setTimeout(
       () => wolfAPI.handleDidChangeTextDocument(event.document),
       clamp(100, 10000, wolfAPI.updateFrequency ?? Infinity)
     );
   }
 
-  function forceRefreshDocument(wolfAPI: WolfAPI) {
-    wolfAPI.activeEditor.edit((selectedText) => {
-      selectedText.insert(new vscode.Position(0, 0), ' ');
-    });
-    setTimeout(() => {
-      wolfAPI.activeEditor.edit((selectedText) => {
-        selectedText.delete(new vscode.Range(
-          new vscode.Position(0, 0),
-          new vscode.Position(0, 1)
-        ));
-      });
-    }, 10);
+  function forceRefreshActiveDocument(wolfAPI: WolfAPI) {
+    throttledHandleDidChangeTextDocument({
+      document: wolfAPI.activeEditor.document
+    } as TextDocumentChangeEvent);
   }
 }
