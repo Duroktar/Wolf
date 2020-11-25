@@ -212,7 +212,7 @@ def parse_eval(*args, **kw):
                 ("error",                         error),
             ])
 
-            WOLF.append(dict(metadata))
+            WOLF.append(metadata)
             wolf_prints()
             sys.exit(0)
     else:
@@ -336,7 +336,7 @@ def result_handler(event):
 
         if not skip and event.kind not in ['return', 'call']:
             # And lastly, update our WOLF results list
-            WOLF.append(dict(metadata))
+            WOLF.append(metadata)
 
 
 def filename_filter(filename):
@@ -481,7 +481,7 @@ def main(filename, test = False):
         ])
 
         # And tack the error on to the end of the response.
-        WOLF.append(dict(metadata))
+        WOLF.append(metadata)
 
     # handle testing
     if test:
