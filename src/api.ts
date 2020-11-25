@@ -128,7 +128,6 @@ export class WolfAPI {
         this.onPythonDataSuccess(data ?? []);
       },
       onError: data => {
-        console.error(data)
         tempFileObj.removeCallback();
         this.onPythonDataError(data);
       }
@@ -153,7 +152,6 @@ export class WolfAPI {
   }
 
   private onPythonDataSuccess = (data?: WolfParsedTraceResults): void => {
-    console.log('Python data received:', data)
     this.prepareAndRenderDecorationsForActiveSession(data ?? []);
     if (this.printLogging) {
       const prettyWolf = this.prettyPrintWolfData(data ?? []);
@@ -185,13 +183,9 @@ export class WolfAPI {
     session: TextEditor,
     data: WolfParsedTraceResults
   ) => {
-    console.log('Preparing parsed data')
     this.decorations.prepareParsedPythonData(data);
-    console.log('Clearing decorations')
     this.clearDecorationsForSession(session);
-    console.log('Setting editordecorations')
     this.decorations.setPreparedDecorationsForEditor(session);
-    console.log('Setting session decorations')
     this.setPreparedDecorationsForSession(session);
   };
 
@@ -323,7 +317,11 @@ export class WolfAPI {
     return this._pythonTracer;
   }
 
-  public get pythonPath(): string | undefined {
-    return this.config.get<string>("pythonPath")
+  public get pythonPath(): string {
+    return this.config.get<string>("pythonPath", 'python3')
+  }
+
+  public async getPythonMajorVersion(): Promise<string> {
+    return await this.tracer.getPythonMajorVersion(this.pythonPath)
   }
 }

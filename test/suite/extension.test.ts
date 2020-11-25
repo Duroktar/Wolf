@@ -24,4 +24,15 @@ suite("Extension Tests", () => {
 
     assert.strictEqual(started?.isActive, true, 'Extension not active');
 	});
+  
+	test("Should use Python 3", async () => {
+
+    const started = vscode.extensions.getExtension("trabpukcip.wolf");
+
+    const api: WolfAPI = await started?.activate()
+    
+    const pyVersion = await api.getPythonMajorVersion()
+
+    assert.strictEqual(pyVersion, '3', 'Must be running Python major version 3')
+	});
 });
