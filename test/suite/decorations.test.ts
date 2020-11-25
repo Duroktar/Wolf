@@ -32,5 +32,5 @@ suite("Extension Tests", () => {
 
       api.stepInWolf()
     })
-	}).timeout(5000);
+	}).timeout(10000);
 });
