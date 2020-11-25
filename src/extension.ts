@@ -34,15 +34,12 @@ export function activate(context: ExtensionContext): WolfAPI {
   }
 
   function startWolf(): void {
-    if (wolfAPI.activeEditorIsDirty) {
-      const message = "Please save the document before running Wolf.";
-      vscode.window.showInformationMessage(message);
-    } else {
-      if (wolfAPI.shouldShowHotModeWarning) {
-        wolfAPI.displayHotModeWarning();
-      }
-      wolfAPI.stepInWolf();
+    if (wolfAPI.shouldShowHotModeWarning) {
+      wolfAPI.displayHotModeWarning();
     }
+    wolfAPI.stepInWolf();
+
+    forceRefreshDocument(wolfAPI);
   }
 
   function stopWolf(): void {
@@ -105,5 +102,19 @@ export function activate(context: ExtensionContext): WolfAPI {
       () => wolfAPI.handleDidChangeTextDocument(event.document),
       clamp(100, 10000, wolfAPI.updateFrequency ?? Infinity)
     );
+  }
+
+  function forceRefreshDocument(wolfAPI: WolfAPI) {
+    wolfAPI.activeEditor.edit((selectedText) => {
+      selectedText.insert(new vscode.Position(0, 0), ' ');
+    });
+    setTimeout(() => {
+      wolfAPI.activeEditor.edit((selectedText) => {
+        selectedText.delete(new vscode.Range(
+          new vscode.Position(0, 0),
+          new vscode.Position(0, 1)
+        ));
+      });
+    }, 10);
   }
 }
