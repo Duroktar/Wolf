@@ -55,17 +55,6 @@ WOLF_MACROS = re.compile(
 # https://regex101.com/r/sf6nAH/2
 
 
-def logout(*args, p=False):
-    if p:
-        print(pformat([pformat(i) for i in args]))
-    else:
-        print(pformat(args, width=200, indent=2), file=sys.stdout)
-
-
-def logerr(*args):
-    print(pformat(args, width=200, indent=2), file=sys.stderr)
-
-
 def import_file(full_name, fullpath):
     """
         The "recommended" method of importing a file by its
