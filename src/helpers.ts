@@ -72,7 +72,7 @@ export function isPositionAtEndOfLine(
 
 export function registerCommand(
   cmdName: string,
-  callBack: () => void
+  callBack: (...args: unknown[]) => unknown
 ): Disposable {
   return vscode.commands.registerCommand(cmdName, callBack);
 }

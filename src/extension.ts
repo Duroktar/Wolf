@@ -62,7 +62,7 @@ export function activate(context: ExtensionContext): WolfAPI {
           );
           wolfAPI.setConfigUpdatedFlag(false);
           stopWolf();
-          startWolf();
+          wolfAPI.stepInWolf();
         } else {
           wolfAPI.enterWolfContext();
           throttledHandleDidChangeTextDocument({
@@ -92,17 +92,15 @@ export function activate(context: ExtensionContext): WolfAPI {
   }
 
   function cancelPending(): void {
-    [updateTimeout].forEach(pending => {
-      if (pending) clearTimeout(pending);
-    });
+    if (updateTimeout) {
+      clearTimeout(updateTimeout);
+    }
   }
 
   function throttledHandleDidChangeTextDocument(
     event: TextDocumentChangeEvent
   ): void {
-    if (updateTimeout) {
-      clearTimeout(updateTimeout);
-    }
+    cancelPending()
     updateTimeout = setTimeout(
       () => wolfAPI.handleDidChangeTextDocument(event.document),
       clamp(100, 10000, wolfAPI.updateFrequency ?? Infinity)
