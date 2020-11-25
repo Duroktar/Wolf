@@ -28,6 +28,7 @@ import re
 import json
 import traceback
 import io
+from collections import OrderedDict
 from copy import deepcopy
 from pprint import pformat
 from importlib import util
@@ -281,14 +282,14 @@ def parse_eval(*args, **kw):
             thrown = traceback.format_exception_only(type(e), e)
             error = '\n'.join(thrown)
             source = event['source'].strip()
-            metadata = {
-                "lineno":              event['lineno'],
-                "source":                       source,
-                "value":                     thrown[0],
-                "error":                         error,
-            }
+            metadata = OrderedDict([
+                ("lineno",              event['lineno']),
+                ("source",                       source),
+                ("value",                     thrown[0]),
+                ("error",                         error),
+            ])
 
-            WOLF.append(metadata)
+            WOLF.append(dict(metadata))
             wolf_prints()
             sys.exit(0)
     else:
@@ -317,10 +318,10 @@ def result_handler(event):
     # of the traced program. This is essentially
     # the metadata returned to the extension in the
     # WOLF list.
-    metadata = {
-        "lineno":             event['lineno'],
+    metadata = OrderedDict([
+        ("lineno",             event['lineno']),
         # "value"    <-  Defined below MAYBE..
-    }
+    ])
 
     # The annotation will take on this value
     # (if present).
@@ -413,7 +414,7 @@ def result_handler(event):
 
         if not skip and event.kind not in ['return', 'call']:
             # And lastly, update our WOLF results list
-            WOLF.append(metadata)
+            WOLF.append(dict(metadata))
 
 
 def filename_filter(filename):
@@ -550,15 +551,15 @@ def main(filename, test = False):
             lineno = tb.lineno
             source = tb.line
 
-        metadata = {
-            "lineno":          lineno,
-            "source":  source.strip(),
-            "value":            value,
-            "error":             True,
-        }
+        metadata = OrderedDict([
+            ("lineno",          lineno),
+            ("source",  source.strip()),
+            ("value",            value),
+            ("error",             True),
+        ])
 
         # And tack the error on to the end of the response.
-        WOLF.append(metadata)
+        WOLF.append(dict(metadata))
 
     # handle testing
     if test:
