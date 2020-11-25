@@ -485,10 +485,14 @@ def main(filename, test = False):
 
     # handle testing
     if test:
-        os.remove(full_path)
         res = wolf_formats()
         WOLF.clear()
-        return res 
+        try:
+            os.remove(full_path)
+        except PermissionError:
+            pass
+        finally:
+            return res 
 
     # print the results and return a 0 for the exit code
     wolf_prints()
