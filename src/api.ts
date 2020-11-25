@@ -128,6 +128,7 @@ export class WolfAPI {
         this.onPythonDataSuccess(data ?? []);
       },
       onError: data => {
+        console.error(data)
         tempFileObj.removeCallback();
         this.onPythonDataError(data);
       }
@@ -183,9 +184,13 @@ export class WolfAPI {
     session: TextEditor,
     data: WolfParsedTraceResults
   ) => {
+    console.log('Preparing parsed data')
     this.decorations.prepareParsedPythonData(data);
+    console.log('Clearing decorations')
     this.clearDecorationsForSession(session);
+    console.log('Setting editor decorations')
     this.decorations.setPreparedDecorationsForEditor(session);
+    console.log('Setting session decorations')
     this.setPreparedDecorationsForSession(session);
   };
 
