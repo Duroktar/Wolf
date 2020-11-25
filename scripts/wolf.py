@@ -34,6 +34,7 @@ from pprint import pformat
 from importlib import util
 from contextlib import contextmanager
 
+from astunparse import unparse
 from hunter import trace
 
 
@@ -111,84 +112,6 @@ def try_deepcopy(obj):
         return deepcopy(obj)
     except TypeError:
         return obj
-
-
-def get_source_segment(source, node, *, padded=False):
-    """Get source code segment of the *source* that generated *node*.
-    If some location information (`lineno`, `end_lineno`, `col_offset`,
-    or `end_col_offset`) is missing, return None.
-    If *padded* is `True`, the first line of a multi-line statement will
-    be padded with spaces to match its original position.
-
-    > Added in Python 3.8 - Taken from: https://github.com/python/cpython/blob/master/Lib/ast.py
-    """
-    try:
-        if node.end_lineno is None or node.end_col_offset is None:
-            return None
-        lineno = node.lineno - 1
-        end_lineno = node.end_lineno - 1
-        col_offset = node.col_offset
-        end_col_offset = node.end_col_offset
-    except AttributeError:
-        return None
-
-    lines = _splitlines_no_ff(source)
-    if end_lineno == lineno:
-        return lines[lineno].encode()[col_offset:end_col_offset].decode()
-
-    if padded:
-        padding = _pad_whitespace(lines[lineno].encode()[:col_offset].decode())
-    else:
-        padding = ''
-
-    first = padding + lines[lineno].encode()[col_offset:].decode()
-    last = lines[end_lineno].encode()[:end_col_offset].decode()
-    lines = lines[lineno+1:end_lineno]
-
-    lines.insert(0, first)
-    lines.append(last)
-    return ''.join(lines)
-
-
-def _splitlines_no_ff(source):
-    """Split a string into lines ignoring form feed and other chars.
-    This mimics how the Python parser splits source code.
-
-    > Added in Python 3.8 - Taken from: https://github.com/python/cpython/blob/master/Lib/ast.py
-    """
-    idx = 0
-    lines = []
-    next_line = ''
-    while idx < len(source):
-        c = source[idx]
-        next_line += c
-        idx += 1
-        # Keep \r\n together
-        if c == '\r' and idx < len(source) and source[idx] == '\n':
-            next_line += '\n'
-            idx += 1
-        if c in '\r\n':
-            lines.append(next_line)
-            next_line = ''
-
-    if next_line:
-        lines.append(next_line)
-    return lines
-
-
-def _pad_whitespace(source):
-    r"""
-    Replace all chars except '\f\t' in a line with spaces.
-
-    > Added in Python 3.8 - Taken from: https://github.com/python/cpython/blob/master/Lib/ast.py
-    """
-    result = ''
-    for c in source:
-        if c in '\f\t':
-            result += c
-        else:
-            result += ' '
-    return result
 
 
 ###################
@@ -347,7 +270,6 @@ def result_handler(event):
 
         # TODO: We should be using the ast instead of regex for all cases.
         tree = ast.parse(source)
-        src_seg = get_source_segment(source, tree.body[0])
 
         # Simplest case.
         if match.group('variable'):
@@ -361,6 +283,7 @@ def result_handler(event):
         # A little magic to parse print args
         elif match.group('print'):
             buffer = io.StringIO()
+            src_seg = unparse(tree).strip()
             try:
                 to_eval = "print({}, file=wolf__buffer__)".format(src_seg[6:-1]) # fixes https://github.com/Duroktar/Wolf/issues/34
                 exec(to_eval, _globals, {**_locals, 'wolf__buffer__': buffer})
@@ -395,9 +318,8 @@ def result_handler(event):
                     # This evaluates the statement with the infixed operator
                     value = parse_eval("{} {} {}".format(left_side_value, operator, value), event=event)
                 else:
-                    print(src_seg[src_seg.index('=')+1:].strip())
                     # Basic macro to evaluate
-                    value = parse_eval(src_seg[src_seg.index('=')+1:].strip(), m_globals_copy, m_locals_copy, event=event)
+                    value = parse_eval(source[source.index('=')+1:].strip(), m_globals_copy, m_locals_copy, event=event)
 
                 # Make sure to display the output as a variable assignment
                 value = "{} = {}".format(local_name, value)
@@ -407,7 +329,7 @@ def result_handler(event):
                 value = parse_eval(match.group('macro').strip(), m_globals_copy, m_locals_copy, event=event)
         else:
             # Basic macro evaluation
-            value = parse_eval(src_seg, m_globals_copy, m_locals_copy, event=event)
+            value = parse_eval(match.group('macro').strip(), m_globals_copy, m_locals_copy, event=event)
 
         # Final results are formatted
         metadata['value'] = resultifier(value)
