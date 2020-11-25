@@ -13,7 +13,7 @@ import { openAndShowTextDocument } from "./helpers";
 suite("Extension Tests", () => {
 	test("Should generate decorations", async () => {
 
-    await openAndShowTextDocument(join(__dirname, '../../', 'test', 'test.py'));
+    await openAndShowTextDocument(join(__dirname, '..', '..', 'test', 'test.py'));
 
     const started = vscode.extensions.getExtension("trabpukcip.wolf");
     const api: WolfAPI = await started?.activate()
