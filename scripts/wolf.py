@@ -112,6 +112,84 @@ def try_deepcopy(obj):
         return obj
 
 
+def get_source_segment(source, node, *, padded=False):
+    """Get source code segment of the *source* that generated *node*.
+    If some location information (`lineno`, `end_lineno`, `col_offset`,
+    or `end_col_offset`) is missing, return None.
+    If *padded* is `True`, the first line of a multi-line statement will
+    be padded with spaces to match its original position.
+
+    > Added in Python 3.8 - Taken from: https://github.com/python/cpython/blob/master/Lib/ast.py
+    """
+    try:
+        if node.end_lineno is None or node.end_col_offset is None:
+            return None
+        lineno = node.lineno - 1
+        end_lineno = node.end_lineno - 1
+        col_offset = node.col_offset
+        end_col_offset = node.end_col_offset
+    except AttributeError:
+        return None
+
+    lines = _splitlines_no_ff(source)
+    if end_lineno == lineno:
+        return lines[lineno].encode()[col_offset:end_col_offset].decode()
+
+    if padded:
+        padding = _pad_whitespace(lines[lineno].encode()[:col_offset].decode())
+    else:
+        padding = ''
+
+    first = padding + lines[lineno].encode()[col_offset:].decode()
+    last = lines[end_lineno].encode()[:end_col_offset].decode()
+    lines = lines[lineno+1:end_lineno]
+
+    lines.insert(0, first)
+    lines.append(last)
+    return ''.join(lines)
+
+
+def _splitlines_no_ff(source):
+    """Split a string into lines ignoring form feed and other chars.
+    This mimics how the Python parser splits source code.
+
+    > Added in Python 3.8 - Taken from: https://github.com/python/cpython/blob/master/Lib/ast.py
+    """
+    idx = 0
+    lines = []
+    next_line = ''
+    while idx < len(source):
+        c = source[idx]
+        next_line += c
+        idx += 1
+        # Keep \r\n together
+        if c == '\r' and idx < len(source) and source[idx] == '\n':
+            next_line += '\n'
+            idx += 1
+        if c in '\r\n':
+            lines.append(next_line)
+            next_line = ''
+
+    if next_line:
+        lines.append(next_line)
+    return lines
+
+
+def _pad_whitespace(source):
+    r"""
+    Replace all chars except '\f\t' in a line with spaces.
+
+    > Added in Python 3.8 - Taken from: https://github.com/python/cpython/blob/master/Lib/ast.py
+    """
+    result = ''
+    for c in source:
+        if c in '\f\t':
+            result += c
+        else:
+            result += ' '
+    return result
+
+
 ###################
 #
 # Wolf Internal API
@@ -268,7 +346,7 @@ def result_handler(event):
 
         # TODO: We should be using the ast instead of regex for all cases.
         tree = ast.parse(source)
-        src_seg = ast.get_source_segment(source, tree.body[0])
+        src_seg = get_source_segment(source, tree.body[0])
 
         # Simplest case.
         if match.group('variable'):
