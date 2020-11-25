@@ -20,6 +20,10 @@ suite("Extension Tests", () => {
 
     assert.strictEqual(api.decorations.hasDecoratons, false, 'Decorations present too early');
 
+    const documentText = api.activeEditor.document.getText();
+    console.log(documentText)
+    assert.notStrictEqual(documentText, '', 'Test file is empty')
+
     return new Promise(resolve => {
       api.on('decorations-changed', () => {
         assert.strictEqual(api.decorations.hasDecoratons, true, 'No decorations')
