@@ -11,10 +11,6 @@ text = 'happy'  # ?
 
 text
 
-unicode_text = 'é'  # ?
-
-unicode_text
-
 # newline characters in strings
 x = "foo\nfaa"  # ?
 
