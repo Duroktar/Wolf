@@ -26,16 +26,20 @@ export class PythonTracer {
     const python = this.getPythonRunner(pythonPath, rootDir, fileName);
     this.timeout = setTimeout(function () { python.kill() }, 10 * 1000);
 
+    console.log('TRACING SCRIPT')
     python.stderr.on("data", (data: Buffer) => {
       if (data.includes("ImportError")) {
+        console.log('IMPORT ERROR')
         installHunter(pythonPath, afterInstall);
         onError();
       } else {
+        console.log('OTHER ERROR:', data.toString())
         onError(data.toString());
       }
     });
 
     python.stdout.on("data", (data: Buffer): void => {
+      console.log('DATA RECEIVED:\n', data.toString())
       onData(this.tryParsePythonData(data) ?? []);
     });
   }
@@ -67,6 +71,7 @@ export class PythonTracer {
   private tryParsePythonData(buffer: Buffer): WolfParsedTraceResults | undefined {
     const asString: string = buffer.toString();
     const index: number = indexOrLast(asString, "WOOF:");
+    console.log('TRYING TO PARSE PYTHON DATA')
     if (index !== -1) {
       try {
         return JSON.parse(asString.slice(index));
@@ -76,6 +81,7 @@ export class PythonTracer {
         console.error(err);
       }
     } else {
+      console.log('ERROR TRYING TO PARSE PYTHON DATA: (index === -1)')
       return null;
     }
   }

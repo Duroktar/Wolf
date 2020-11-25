@@ -153,6 +153,7 @@ export class WolfAPI {
   }
 
   private onPythonDataSuccess = (data?: WolfParsedTraceResults): void => {
+    console.log('Python data received:', data)
     this.prepareAndRenderDecorationsForActiveSession(data ?? []);
     if (this.printLogging) {
       const prettyWolf = this.prettyPrintWolfData(data ?? []);
@@ -188,7 +189,7 @@ export class WolfAPI {
     this.decorations.prepareParsedPythonData(data);
     console.log('Clearing decorations')
     this.clearDecorationsForSession(session);
-    console.log('Setting editor decorations')
+    console.log('Setting editordecorations')
     this.decorations.setPreparedDecorationsForEditor(session);
     console.log('Setting session decorations')
     this.setPreparedDecorationsForSession(session);
