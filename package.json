@@ -133,6 +133,8 @@
   "scripts": {
     "vscode:prepublish": "yarn run compile",
     "compile": "tsc -p ./",
+    "postinstall": "yarn run copy-files",
+    "copy-files": "copyfiles -u 1 scripts/test.py out/test/",
     "lint": "eslint src --ext ts",
     "pretest": "yarn run compile",
     "test": "node ./out/test/runTest.js",
@@ -149,6 +151,7 @@
     "@types/vscode": "^1.51.0",
     "@typescript-eslint/eslint-plugin": "^4.8.1",
     "@typescript-eslint/parser": "^4.8.1",
+    "copyfiles": "^2.4.0",
     "eslint": "^7.13.0",
     "glob": "^7.1.6",
     "mocha": "^8.1.3",
