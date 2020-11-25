@@ -27,7 +27,7 @@ jobs:
       with:
         node-version: 10.x
     - run: yarn install
-    - run: xvfb-run -a yarn test
+    - run: xvfb-run -a npm test
       if: runner.os == 'Linux'
-    - run: yarn test
+    - run: npm test
       if: runner.os != 'Linux'
