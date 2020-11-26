@@ -369,7 +369,7 @@ def test(snippet):
     tmpfile_name = os.path.basename(tmpfile_path).split('.')[0]
     filename = os.path.basename(tmpfile_path)
 
-    with open(full_path, 'a') as the_file:
+    with open(full_path, 'a', encoding="utf-8") as the_file:
         the_file.write(snippet.strip() + '\n')
 
     return main(full_path, test=True) 

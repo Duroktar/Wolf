@@ -5,12 +5,10 @@ snippet = u"""
 unicode_text = 'é'  # ?
 
 unicode_text
+
+print("🍆") #?
 """
 
 def test_unicode(snapshot):
-
-    if platform == "win32":
-        return
-
     res = wolftest(snippet)
     snapshot.assert_match(res)
