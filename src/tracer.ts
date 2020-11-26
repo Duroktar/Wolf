@@ -61,7 +61,15 @@ export class PythonTracer {
 
   private getPythonRunner(pythonPath: string, rootDir: string, scriptName: string) {
     const wolfPath: string = path.join(rootDir, "scripts/wolf.py");
-    return spawn(pythonPath, [wolfPath, scriptName]);
+    const options = { env: {} as Record<string, string> }
+    
+    /* Copied from https://github.com/Almenon/AREPL-backend/blob/209eb5b8ae8cda1677f925749a10cd263f6d9860/index.ts#L85-L93 */
+    if (process.platform == "darwin") {
+			// needed for Mac to prevent ENOENT
+			options.env.PATH = ["/usr/local/bin", process.env.PATH].join(":")
+		}
+
+    return spawn(pythonPath, [wolfPath, scriptName], options);
   }
 
   public getPythonMajorVersion(pythonPath: string): Promise<string> {
