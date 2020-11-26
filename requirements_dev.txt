@@ -1,4 +1,8 @@
+astunparse~=1.6.3
 autopep8~=1.3.4
 flake8~=3.5.0
-rope~=0.10.7
 hunter~=2.0.2
+pytest-watch~=4.2.0
+pytest~=6.1.2
+rope~=0.10.7
+snapshottest~=0.6.0

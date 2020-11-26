@@ -19,32 +19,34 @@ import {
   WolfStandardDecorationTypes,
   WolfTraceLineResult,
   WolfParsedTraceResults,
-  WolfValue
+  WolfDecorationMoveOptions
 } from "./types";
 import { wolfTextColorProvider } from "./colors";
 import { wolfIconProvider } from "./icons";
 import {
   getActiveEditor,
   formatWolfResponseElement,
-  stringEscape,
-  clamp
-} from "./utils";
-const beautify = require("js-beautify").js;
+  stringEscape} from "./helpers";
+import { clamp } from "./utils";
 
-export function wolfDecorationStoreFactory(context: ExtensionContext) {
+import { js as beautify } from "js-beautify";
+
+export function wolfDecorationStoreFactory(
+  context: ExtensionContext,
+): WolfDecorationsController {
   return new WolfDecorationsController(context);
 }
 
 export class WolfDecorationsController {
   private _decorations: WolfDecorationMapping = {};
-  private _decorationTypes: WolfStandardDecorationTypes;
-  private _preparedDecorations: WolfSessionDecorations;
+  private _decorationTypes: WolfStandardDecorationTypes | null = null;
+  private _preparedDecorations: WolfSessionDecorations | null = null;
 
   constructor(public context: ExtensionContext) {}
 
   private createEditorDecorationForGutters = (
     gutterIconColor: WolfColorSelection,
-    leftMargin: number = 3
+    leftMargin = 3
   ): TextEditorDecorationType => {
     return window.createTextEditorDecorationType({
       after: {
@@ -67,9 +69,9 @@ export class WolfDecorationsController {
   private createWolfDecorationOptions = (
     options: WolfDecorationOptions
   ): DecorationOptions => {
-    const truncLength: number = workspace
+    const truncLength = workspace
       .getConfiguration("wolf")
-      .get("maxLineLength");
+      .get<number>("maxLineLength") ?? 100;
     const textLength: number = options.text.length;
     const ellipsis: string = textLength > truncLength ? " ..." : "";
     return {
@@ -125,8 +127,9 @@ export class WolfDecorationsController {
     return this._decorations[lineNo];
   };
 
-  public getDecorationTypes = (): WolfStandardDecorationTypes => {
-    return this._decorationTypes;
+  public getDecorationTypes = (): WolfStandardDecorationTypes | undefined => {
+    if (this._decorationTypes)
+      return this._decorationTypes;
   };
 
   public getEmptyDecorations = (): WolfSessionDecorations => {
@@ -139,7 +142,7 @@ export class WolfDecorationsController {
   private getLineDecorationOrDefault = (lineNo: number): WolfLineDecoration => {
     return (
       this.getDecorationAtLine(lineNo) ||
-      ({ data: [], pretty: [] } as WolfLineDecoration)
+      ({ data: [], pretty: [] } as unknown as WolfLineDecoration)
     );
   };
 
@@ -152,13 +155,13 @@ export class WolfDecorationsController {
   };
 
   public prepareParsedPythonData = (data: WolfParsedTraceResults): void => {
-    for (let line of data) {
+    for (const line of data ?? []) {
       this.parseLineAndSetDecoration(line);
     }
   };
 
   public parseLineAndSetDecoration = (line: WolfTraceLineResult): void => {
-    const annotation: WolfValue = formatWolfResponseElement(line);
+    const annotation = formatWolfResponseElement(line);
     const lineNo: number = line.lineno;
     const pretty: string = beautify(line.value, {
       indent_size: 4,
@@ -171,7 +174,7 @@ export class WolfDecorationsController {
       data: [...existing.data, stringEscape(annotation)],
       lineno: lineNo,
       error: line.error ? true : false,
-      loop: line.hasOwnProperty("_loop"),
+      loop: line["_loop"],
       pretty: [...existing.pretty, pretty]
     } as WolfLineDecoration;
     this.setDecorationAtLine(lineNo, decoration);
@@ -254,8 +257,8 @@ export class WolfDecorationsController {
     end = -1,
     swap = true,
     step = 1
-  }) => {
-    const nextAnnotations = {};
+  }: WolfDecorationMoveOptions): void => {
+    const nextAnnotations: WolfDecorationMapping = {};
     Object.keys(this._decorations).forEach(key => {
       const intKey = parseInt(key, 10);
       let nextKey;
@@ -274,8 +277,13 @@ export class WolfDecorationsController {
     this._decorations = { ...nextAnnotations };
   };
 
-  public shiftDecorationsUp = ({ start, end = -1, swap = true, step = 1 }) => {
-    const nextAnnotations = {};
+  public shiftDecorationsUp = ({
+    start,
+    end = -1,
+    swap = true,
+    step = 1,
+  }: WolfDecorationMoveOptions): void => {
+    const nextAnnotations: WolfDecorationMapping = {};
     Object.keys(this._decorations).forEach(key => {
       const intKey = parseInt(key, 10);
       let nextKey;
@@ -302,8 +310,8 @@ export class WolfDecorationsController {
   }
 
   public get pawprints(): boolean {
-    return workspace.getConfiguration("wolf").get("pawPrintsInGutter")
-      ? true
-      : false;
+    return workspace
+      .getConfiguration("wolf")
+      .get<boolean>("pawPrintsInGutter") ?? false;
   }
 }

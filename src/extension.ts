@@ -7,13 +7,17 @@ import {
 
 import { wolfStandardApiFactory, WolfAPI } from "./api";
 import { ActiveTextEditorChangeEventResult } from "./types";
-import { clamp, registerCommand } from "./utils";
+import { registerCommand } from "./helpers";
+import { clamp } from "./utils";
 
-export function activate(context: ExtensionContext) {
+export function activate(context: ExtensionContext): WolfAPI {
   const output: OutputChannel = vscode.window.createOutputChannel("Wolf");
   const wolfAPI: WolfAPI = wolfStandardApiFactory(context, { output });
+  let updateTimeout: null | NodeJS.Timeout = null;
 
   initializeWolfExtension();
+
+  return wolfAPI;
 
   function initializeWolfExtension(): void {
     context.subscriptions.push(
@@ -23,27 +27,26 @@ export function activate(context: ExtensionContext) {
       registerCommand("wolf.stopBarking", stopWolf)
     );
 
-    const opts = [null, context.subscriptions];
-    vscode.window.onDidChangeActiveTextEditor(changedActiveTextEditor, ...opts);
-    vscode.workspace.onDidChangeTextDocument(changedTextDocument, ...opts);
-    vscode.workspace.onDidChangeConfiguration(changedConfiguration, ...opts);
+    const sharedOptions = [null, context.subscriptions];
+    vscode.window.onDidChangeActiveTextEditor(changedActiveTextEditor, ...sharedOptions);
+    vscode.workspace.onDidChangeTextDocument(changedTextDocument, ...sharedOptions);
+    vscode.workspace.onDidChangeConfiguration(changedConfiguration, ...sharedOptions);
   }
 
   function startWolf(): void {
-    if (wolfAPI.activeEditorIsDirty) {
-      const message = "Please save the document before running Wolf.";
-      vscode.window.showInformationMessage(message);
-    } else {
-      if (wolfAPI.shouldShowHotModeWarning) {
-        wolfAPI.displayHotModeWarning();
-      }
-      wolfAPI.stepInWolf();
+    if (wolfAPI.shouldShowHotModeWarning) {
+      wolfAPI.displayHotModeWarning();
     }
+
+    wolfAPI.stepInWolf();
+
+    if (wolfAPI.activeEditorIsDirty)
+      forceRefreshActiveDocument(wolfAPI);
   }
 
   function stopWolf(): void {
     wolfAPI.stopWolf();
-    cancelPending();
+    clearThrottleUpdateBuffer();
   }
 
   function changedActiveTextEditor(
@@ -58,12 +61,10 @@ export function activate(context: ExtensionContext) {
           );
           wolfAPI.setConfigUpdatedFlag(false);
           stopWolf();
-          startWolf();
+          wolfAPI.stepInWolf();
         } else {
           wolfAPI.enterWolfContext();
-          throttledHandleDidChangeTextDocument({
-            document: editor.document
-          } as TextDocumentChangeEvent);
+          forceRefreshActiveDocument(wolfAPI);
         }
       } else {
         wolfAPI.exitWolfContext();
@@ -77,7 +78,7 @@ export function activate(context: ExtensionContext) {
     }
   }
 
-  function changedConfiguration(event): void {
+  function changedConfiguration(event: vscode.ConfigurationChangeEvent): void {
     if (
       event.affectsConfiguration("wolf.pawPrintsInGutter") ||
       event.affectsConfiguration("wolf.updateFrequency") ||
@@ -87,23 +88,25 @@ export function activate(context: ExtensionContext) {
     }
   }
 
-  let updateTimeout = null;
-
-  function cancelPending(): void {
-    [updateTimeout].forEach(pending => {
-      if (pending) clearTimeout(pending);
-    });
+  function clearThrottleUpdateBuffer(): void {
+    if (updateTimeout) {
+      clearTimeout(updateTimeout);
+    }
   }
 
   function throttledHandleDidChangeTextDocument(
     event: TextDocumentChangeEvent
   ): void {
-    if (updateTimeout) {
-      clearTimeout(updateTimeout);
-    }
+    clearThrottleUpdateBuffer()
     updateTimeout = setTimeout(
       () => wolfAPI.handleDidChangeTextDocument(event.document),
-      clamp(100, 10000, wolfAPI.updateFrequency)
+      clamp(100, 10000, wolfAPI.updateFrequency ?? Infinity)
     );
+  }
+
+  function forceRefreshActiveDocument(wolfAPI: WolfAPI) {
+    throttledHandleDidChangeTextDocument({
+      document: wolfAPI.activeEditor.document
+    } as TextDocumentChangeEvent);
   }
 }

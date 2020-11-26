@@ -1,4 +1,4 @@
-""" Wolf - It kicks the Quokkas ass.
+r""" Wolf - It kicks the Quokkas ass.
       .-"-.
      / /|  \                     _  __
     | <'/   |                   | |/ _|
@@ -21,17 +21,20 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 """
+import ast
 import os
 import sys
 import re
 import json
 import traceback
 import io
+from collections import OrderedDict
 from copy import deepcopy
 from pprint import pformat
 from importlib import util
 from contextlib import contextmanager
 
+from astunparse import unparse
 from hunter import trace
 
 
@@ -50,17 +53,6 @@ WOLF_MACROS = re.compile(
 
 # XXX: For parsing hunter.CodePrinter output see:
 # https://regex101.com/r/sf6nAH/2
-
-
-def logout(*args, p=False):
-    if p:
-        print(pformat([pformat(i) for i in args]))
-    else:
-        print(pformat(args, width=200, indent=2), file=sys.stdout)
-
-
-def logerr(*args):
-    print(pformat(args, width=200, indent=2), file=sys.stderr)
 
 
 def import_file(full_name, fullpath):
@@ -167,25 +159,27 @@ def resultifier(value):
     #       <function add at 0x7f768395ad95>
     #
     #########
+    if isinstance(value, bool):
+        return str(value)
     if callable(value):
         return repr(value)
-    elif value is None:
+    if value is None:
         return 'None'
-    elif isinstance(value, int):
-        return value
-    else:
-        return str(value)
+    return str(value)
 
 
-def wolf_prints():
+def wolf_formats():
     # It's important that we create an output that can be handled
     # by the javascript `JSON.parse(...)` function.
     results = (json.dumps(i) for i in WOLF if contains_any(
         'value', i.keys()) or i['error'])
     python_data = ", ".join(results)
 
+    return "[" + python_data + "]"
+
+def wolf_prints():
     # DO NOT TOUCH, ie: no pretty printing
-    print("WOOF: [" + python_data + "]")  # <--  Wolf result
+    print("WOOF: " + wolf_formats())  # <--  Wolf result
     ######################################
 
 
@@ -197,13 +191,15 @@ def parse_eval(*args, **kw):
         rv = eval(*args)
     except Exception as e:
         if event['kind'] == 'line':
-            value = traceback.format_exception_only(type(e), e)[0]
-            metadata = {
-                "lineno":              event['lineno'],
-                "source":      event['source'].strip(),
-                "value":                         value,
-                "error":                          True,
-            }
+            thrown = traceback.format_exception_only(type(e), e)
+            error = '\n'.join(thrown)
+            source = event['source'].strip()
+            metadata = OrderedDict([
+                ("lineno",              event['lineno']),
+                ("source",                       source),
+                ("value",                     thrown[0]),
+                ("error",                         error),
+            ])
 
             WOLF.append(metadata)
             wolf_prints()
@@ -234,10 +230,10 @@ def result_handler(event):
     # of the traced program. This is essentially
     # the metadata returned to the extension in the
     # WOLF list.
-    metadata = {
-        "lineno":             event['lineno'],
+    metadata = OrderedDict([
+        ("lineno",             event['lineno']),
         # "value"    <-  Defined below MAYBE..
-    }
+    ])
 
     # The annotation will take on this value
     # (if present).
@@ -259,7 +255,10 @@ def result_handler(event):
     skip = False
 
     # Regex match groups are used for convenience.
-    if match:
+    if source not in ['pass', 'break', 'continue'] and match: # fixes https://github.com/Duroktar/Wolf/issues/28 to 30
+
+        # TODO: We should be using the ast instead of regex for all cases.
+        tree = ast.parse(source)
 
         # Simplest case.
         if match.group('variable'):
@@ -271,49 +270,55 @@ def result_handler(event):
                 skip = True
 
         # A little magic to parse print args
-        if match.group('print'):
+        elif match.group('print'):
             buffer = io.StringIO()
+            src_seg = unparse(tree).strip()
             try:
-                to_eval = "print({}, file=wolf__buffer__)".format(
-                    match.group('print'))
+                to_eval = "print({}, file=wolf__buffer__)".format(src_seg[6:-1]) # fixes https://github.com/Duroktar/Wolf/issues/34
                 exec(to_eval, _globals, {**_locals, 'wolf__buffer__': buffer})
                 value = str(buffer.getvalue()).strip('\n')
             finally:
                 buffer.close()
 
         # Macros require a few more steps..
-        if match.group('macro'):
+        elif match.group('macro'):
 
             # XXX: This is to help avoid side effects when evaluating expressions
             m_locals_copy = {k: try_deepcopy(v) for k, v in _locals.items()}
             m_globals_copy = {k: try_deepcopy(v) for k, v in _globals.items()}
 
-            # Basic macro to evaluate
-            value = parse_eval(match.group('macro').strip(),
-                               m_globals_copy, m_locals_copy, event=event)
+            if isinstance(tree.body[0], ast.Assign):
+                node = tree.body[0]
 
-            # Value is being assigned to a variable (local)
-            if match.group('local'):
+                if hasattr(node, 'target'):
+                    target = node.target
+                else:
+                    target = node.targets[0]
+
                 # Get the variable name
-                local_name = match.group('local').strip()
+                local_name = target.id
 
-                if match.group('operator') or match.group('assignment'):
-                    if event.function == '<listcomp>':
-                        skip = True
-
-                # This is for += -= *= and /= assignments
-                if match.group('operator'):
+                if isinstance(tree.body[0], ast.AugAssign):
+                    operator = {'Mult': '*=', 'Add': '+=', 'Sub': '-=', 'Div': '/='}[node.op]
 
                     # This get the value of the local variable from earlier
-                    left_side_value = parse_eval(local_name,
-                                                 m_globals_copy, m_locals_copy, event=event)
+                    left_side_value = parse_eval(local_name, m_globals_copy, m_locals_copy, event=event)
 
                     # This evaluates the statement with the infixed operator
-                    value = parse_eval("{} {} {}".format(left_side_value,
-                                                         match.group('operator').strip()[0], value), event=event)
+                    value = parse_eval("{} {} {}".format(left_side_value, operator, value), event=event)
+                else:
+                    # Basic macro to evaluate
+                    value = parse_eval(source[source.index('=')+1:].strip(), m_globals_copy, m_locals_copy, event=event)
 
                 # Make sure to display the output as a variable assignment
                 value = "{} = {}".format(local_name, value)
+
+            else:
+                # Basic macro evaluation
+                value = parse_eval(match.group('macro').strip(), m_globals_copy, m_locals_copy, event=event)
+        else:
+            # Basic macro evaluation
+            value = parse_eval(match.group('macro').strip(), m_globals_copy, m_locals_copy, event=event)
 
         # Final results are formatted
         metadata['value'] = resultifier(value)
@@ -350,8 +355,25 @@ def import_and_trace_script(module_name, module_path):
         with trace(filename_filter(module_path), action=result_handler):
             import_file(module_name, module_path)
 
+def test(snippet):
+    """
+        TODO
+    """
+    from tempfile import mkstemp
 
-def main(filename):
+    testdir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tests')
+    tmpfile_path = mkstemp(suffix=".py", text=True)[1]
+    full_path = os.path.abspath(tmpfile_path)
+    tmpfile_name = os.path.basename(tmpfile_path).split('.')[0]
+    filename = os.path.basename(tmpfile_path)
+
+    with open(full_path, 'a') as the_file:
+        the_file.write(snippet.strip() + '\n')
+
+    return main(full_path, test=True) 
+
+
+def main(filename, test = False):
     """
         Simply ensures the target script exists and calls
         the import_and_trace_script function. The results
@@ -440,15 +462,26 @@ def main(filename):
             lineno = tb.lineno
             source = tb.line
 
-        metadata = {
-            "lineno":          lineno,
-            "source":  source.strip(),
-            "value":            value,
-            "error":             True,
-        }
+        metadata = OrderedDict([
+            ("lineno",          lineno),
+            ("source",  source.strip()),
+            ("value",            value),
+            ("error",             True),
+        ])
 
         # And tack the error on to the end of the response.
         WOLF.append(metadata)
+
+    # handle testing
+    if test:
+        res = wolf_formats()
+        WOLF.clear()
+        try:
+            os.remove(full_path)
+        except PermissionError:
+            pass
+        finally:
+            return res 
 
     # print the results and return a 0 for the exit code
     wolf_prints()
