@@ -159,6 +159,10 @@ so I'll know if it regresses.
 
 ## **Changelog**
 
+## v0.4.1 ~ Patch
+
+Fixed issues 52 and 53 on GitHub and added test cases for each (Fixes contributed by @[Almenon](https://github.com/Almenon))
+
 ## v0.4.0 ~ Minor Release
 
 ### Run extension on unsaved files
@@ -396,7 +400,7 @@ on your own, if you just want to do that. Welcome one, welcome all!
 
 The following people have contributed to Wolf:
 
-[Almenon](https://github.com/Almenon) - Windows fixes, Python 3.5 support, tests & many more fixes and improvements ~ [#3](https://github.com/Duroktar/Wolf/pull/3) [#6](https://github.com/Duroktar/Wolf/pull/6) [#13](https://github.com/Duroktar/Wolf/pull/13)
+[Almenon](https://github.com/Almenon) - Windows fixes, Python 3.5 support, tests & many more fixes and improvements ~ [#3](https://github.com/Duroktar/Wolf/pull/3) [#6](https://github.com/Duroktar/Wolf/pull/6) [#13](https://github.com/Duroktar/Wolf/pull/13) [#52](https://github.com/Duroktar/Wolf/issues/52) [#53](https://github.com/Duroktar/Wolf/issues/53)
 
 ## License
 
