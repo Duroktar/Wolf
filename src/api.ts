@@ -26,6 +26,7 @@ import { getActiveEditor, makeTempFile } from "./helpers";
 import { hotModeWarning } from "./hotWarning";
 import { wolfOutputFactory, WolfOutputController } from "./output";
 import { EventEmitter } from "events";
+import { platform } from "os";
 
 export function wolfStandardApiFactory(
   context: ExtensionContext,
@@ -317,8 +318,11 @@ export class WolfAPI {
     return this._pythonTracer;
   }
 
+  private __platform = platform()
+
   public get pythonPath(): string {
-    return this.config.get<string>("pythonPath") ?? process.platform === "win32" ? 'python' : 'python3'
+    console.log('this.__platform:', this.__platform)
+    return this.config.get<string>("pythonPath") ?? this.__platform === "win32" ? 'python' : 'python3'
   }
 
   public async getPythonMajorVersion(): Promise<string> {
