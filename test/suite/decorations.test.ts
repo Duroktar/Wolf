@@ -31,5 +31,5 @@ suite("Extension Tests", () => {
 
       api.stepInWolf()
     })
-	}).timeout(10000);
+	}).timeout(30000); // This can sometimes take awhile on CI servers.
 });
