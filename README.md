@@ -85,8 +85,7 @@ Wolf is Good for:
 ## Requirements
 
 * Visual Studio Code
-* Python 3.5 - 3.6
-* Hunter - Available on pip (pip install hunter)
+* Python 3.5 - 3.8 (tested on 3.5, 3.6, and 3.8)
 
 ## Extension Settings
 
@@ -150,7 +149,37 @@ You can't get any better than _live feedback next to the code you're editing_!
 
 ---
 
+## Known Bugs/Issues
+
+### The `1 + 334  #?  335` example from above doesn't work in Python 3.8
+
+It's possible the tracer just passes over non-binding expressions but it
+could also be a bug.. I'm not really sure ATM but there's a unit test
+so I'll know if it regresses.
+
 ## **Changelog**
+
+## v0.4.0 ~ Minor Release
+
+### Run extension on unsaved files
+
+This was a limitation of the previous versions of Wolf and is a
+really nice QOL feature when coding on the fly.
+
+### More Extensive Tests
+
+Using github-actions Wolf is now tested against windows, macos, and windows,
+for Python versions 3.5, 3.6, and 3.8. This caught more than a few bugs that
+should make it easier for new users to get running with Wolf faster.
+
+### Updated Dependencies
+
+Now using the latest vscode extension APIs and Python 3rd party deps.
+
+### Bug Fixes
+
+Fixed issues 28, 29, 30, and 34 on GitHub. Fixed some cross compatibility issues
+with Python v3.6, and v3.8.
 
 ## v0.3.10 ~ Patch
 
