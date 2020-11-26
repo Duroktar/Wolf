@@ -318,7 +318,7 @@ export class WolfAPI {
   }
 
   public get pythonPath(): string {
-    return this.config.get<string>("pythonPath", 'python3')
+    return this.config.get<string>("pythonPath", process.platform === "darwin" ? 'python3' : 'python')
   }
 
   public async getPythonMajorVersion(): Promise<string> {
