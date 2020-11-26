@@ -68,6 +68,11 @@ export class PythonTracer {
 			// needed for Mac to prevent ENOENT
 			options.env.PATH = ["/usr/local/bin", process.env.PATH].join(":")
 		}
+    else if (process.platform == "win32") {
+			// needed for windows for encoding to match what it would be in terminal
+			// https://docs.python.org/3/library/sys.html#sys.stdin
+      options.env.PYTHONIOENCODING = 'utf8'
+    }
 
     return spawn(pythonPath, [wolfPath, scriptName], options);
   }
