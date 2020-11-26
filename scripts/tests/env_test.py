@@ -11,4 +11,5 @@ print(path)
 def test_env(snapshot):
     res = wolftest(snippet)
     line_decoration_count = len(loads(res))
+    print(loads(res))
     assert line_decoration_count > 1
