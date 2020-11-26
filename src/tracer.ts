@@ -61,12 +61,10 @@ export class PythonTracer {
 
   private getPythonRunner(pythonPath: string, rootDir: string, scriptName: string) {
     const wolfPath: string = path.join(rootDir, "scripts/wolf.py");
-    console.log('Spawning pythonPath:', pythonPath)
     return spawn(pythonPath, [wolfPath, scriptName]);
   }
 
   public getPythonMajorVersion(pythonPath: string): Promise<string> {
-    console.log('Spawning pythonPath:', pythonPath)
     const child = spawn(pythonPath, ['--version']);
     return new Promise((resolve, reject) => {
       child.stderr.on('data', err => {

@@ -321,12 +321,9 @@ export class WolfAPI {
   private __platform = platform().trim()
 
   public get pythonPath(): string {
-    console.log('this.__platform:', this.__platform)
     const fromconfig = this.config.get<string>("pythonPath")
-    console.log('fromconfig:', fromconfig || '(undefined)')
-    const pypath = fromconfig || this.__platform === "win32" ? 'python' : 'python3'
-    console.log('pypath:', pypath)
-    return pypath
+    /* Github-Actions Windows CI tests don't like 'python3' */
+    return fromconfig || this.__platform === "win32" ? 'python' : 'python3'
   }
 
   public getPythonMajorVersion = async (): Promise<string> => {
