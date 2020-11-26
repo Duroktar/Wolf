@@ -322,10 +322,12 @@ export class WolfAPI {
 
   public get pythonPath(): string {
     console.log('this.__platform:', this.__platform)
-    return this.config.get<string>("pythonPath") ?? this.__platform === "win32" ? 'python' : 'python3'
+    const pypath = this.config.get<string>("pythonPath") ?? this.__platform === "win32" ? 'python' : 'python3'
+    console.log('pypath:', pypath)
+    return pypath
   }
 
-  public async getPythonMajorVersion(): Promise<string> {
+  public getPythonMajorVersion = async (): Promise<string> => {
     return await this.tracer.getPythonMajorVersion(this.pythonPath)
   }
 }

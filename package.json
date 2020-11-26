@@ -54,7 +54,7 @@
         },
         "wolf.pythonPath": {
           "type": "string",
-          "description": "which python to use - MUST be version 3.5 or greater (default: python) (macos default: python3)"
+          "description": "A different path to python - MUST be version 3.5 or greater"
         }
       }
     },
