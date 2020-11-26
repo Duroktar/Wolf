@@ -318,11 +318,13 @@ export class WolfAPI {
     return this._pythonTracer;
   }
 
-  private __platform = platform()
+  private __platform = platform().trim()
 
   public get pythonPath(): string {
     console.log('this.__platform:', this.__platform)
-    const pypath = this.config.get<string>("pythonPath") ?? this.__platform === "win32" ? 'python' : 'python3'
+    const fromconfig = this.config.get<string>("pythonPath")
+    console.log('fromconfig:', fromconfig || '(undefined)')
+    const pypath = fromconfig || this.__platform === "win32" ? 'python' : 'python3'
     console.log('pypath:', pypath)
     return pypath
   }
