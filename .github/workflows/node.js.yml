@@ -6,10 +6,10 @@ on:
     branches: 
       - master
       - develop
+      - issue/**
   pull_request:
     branches:
       - master
-      - develop
 
 jobs:
   build:

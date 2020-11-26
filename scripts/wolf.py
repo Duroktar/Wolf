@@ -95,11 +95,12 @@ def get_line_from_file(_file, lineno):
 def try_deepcopy(obj):
     """ 
         Deepcopy can throw a type error when sys modules are to be
-        included in the object being copied..
+        included in the object being copied.. It can also throw an
+        AttributeError in python 3.5 for some reason..
     """
     try:
         return deepcopy(obj)
-    except TypeError:
+    except (TypeError, AttributeError):
         return obj
 
 
@@ -199,6 +200,7 @@ def parse_eval(*args, **kw):
                 ("source",                       source),
                 ("value",                     thrown[0]),
                 ("error",                         error),
+                # ("filename",          event['filename']),
             ])
 
             WOLF.append(metadata)
@@ -464,6 +466,7 @@ def main(filename, test = False):
 
         metadata = OrderedDict([
             ("lineno",          lineno),
+            # ("filename",   tb.filename),
             ("source",  source.strip()),
             ("value",            value),
             ("error",             True),
