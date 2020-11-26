@@ -4,7 +4,6 @@ from json import loads
 snippet = r"""
 import os
 
-test=os.environ['USER'] #?
 path=os.environ['PATH'] #?
 print(path)
 """
