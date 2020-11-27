@@ -15,7 +15,7 @@ import {
   WolfDecorationOptions,
   WolfDecorationMapping,
   WolfLineDecoration,
-  WolfSessionDecorations,
+  WolfDecorations,
   WolfStandardDecorationTypes,
   WolfTraceLineResult,
   WolfParsedTraceResults,
@@ -40,7 +40,7 @@ export function wolfDecorationStoreFactory(
 export class WolfDecorationsController {
   private _decorations: WolfDecorationMapping = {};
   private _decorationTypes: WolfStandardDecorationTypes | null = null;
-  private _preparedDecorations: WolfSessionDecorations | null = null;
+  private _preparedDecorations: WolfDecorations | null = null;
 
   constructor(public context: ExtensionContext) {}
 
@@ -132,11 +132,11 @@ export class WolfDecorationsController {
       return this._decorationTypes;
   };
 
-  public getEmptyDecorations = (): WolfSessionDecorations => {
+  public getEmptyDecorations = (): WolfDecorations => {
     return {
       success: [],
       error: []
-    } as WolfSessionDecorations;
+    } as WolfDecorations;
   };
 
   private getLineDecorationOrDefault = (lineNo: number): WolfLineDecoration => {
@@ -146,9 +146,9 @@ export class WolfDecorationsController {
     );
   };
 
-  public getPreparedDecorations = (): WolfSessionDecorations => {
+  public getPreparedDecorations = (): WolfDecorations => {
     if (this._preparedDecorations) {
-      return this._preparedDecorations as WolfSessionDecorations;
+      return this._preparedDecorations as WolfDecorations;
     } else {
       return this.getEmptyDecorations();
     }
@@ -249,7 +249,7 @@ export class WolfDecorationsController {
     this._preparedDecorations = {
       success: decorations,
       error: errorDecorations
-    } as WolfSessionDecorations;
+    } as WolfDecorations;
   };
 
   public shiftDecorationsDown = ({

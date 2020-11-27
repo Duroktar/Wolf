@@ -58,7 +58,7 @@ export interface WolfStandardDecorationTypes {
   error: TextEditorDecorationType;
 }
 
-export interface WolfSessionDecorations {
+export interface WolfDecorations {
   success: DecorationOptions[];
   error: DecorationOptions[];
 }
@@ -74,15 +74,15 @@ export interface WolfTraceLineResult {
   _loop?: boolean;
 }
 
-export type WolfParsedTraceResults = WolfTraceLineResult[] | null;
+export type WolfParsedTraceResults = WolfTraceLineResult[] | null | undefined;
+export type TracerParsedResultTuple = [WolfParsedTraceResults, string]
 
 export interface WolfTracerInterface {
   pythonPath: string;
   fileName: string;
   rootDir: string;
-  afterInstall: () => void;
-  onData: (WolfParsedTraceResults: WolfTraceLineResult[] | undefined) => void;
-  onError: (message?: string) => void;
 }
 
 export type ActiveTextEditorChangeEventResult = TextEditor | undefined;
+
+export type WolfEvent = 'decorations-changed';

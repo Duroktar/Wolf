@@ -99,7 +99,7 @@ export function activate(context: ExtensionContext): WolfAPI {
   ): void {
     clearThrottleUpdateBuffer()
     updateTimeout = setTimeout(
-      () => wolfAPI.handleDidChangeTextDocument(event.document),
+      () => wolfAPI.traceAndSetDecorationsUsingTempFile(event.document),
       clamp(100, 10000, wolfAPI.updateFrequency ?? Infinity)
     );
   }
