@@ -137,7 +137,7 @@
     "postinstall": "yarn run copy-files",
     "copy-files": "copyfiles -E -u 1 \"scripts/test.py\" \"out/test/\"",
     "lint": "eslint src --ext ts",
-    "pretest": "yarn run test-compile && yarn run copy-files",
+    "pretest": "yarn webpack && yarn run test-compile && yarn run copy-files",
     "test": "node ./out/test/runTest.js",
     "watch": "tsc -watch -p ./",
     "ext:package": "vsce package",
