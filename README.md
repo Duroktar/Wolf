@@ -157,11 +157,30 @@ It's possible the tracer just passes over non-binding expressions but it
 could also be a bug.. I'm not really sure ATM but there's a unit test
 so I'll know if it regresses.
 
+### It doesn't work inside UnitTests
+
+I know :( Not really sure how to fix this one yet but I'll get to it someday.
+
 ## **Changelog**
+
+## v0.4.3 ~ Patch
+
+### Flashing Bug Fixed
+
+Wolf annotations no longer stutter/flash when editing files. Makes for a much
+smoother coding experience.
+
+> See #46 comment about "flashing on updates"
+
+### Other Changes:
+
+- Reduced extension size ala webpack bundling.
+- Code cleanup and removal of unused APIs.
 
 ## v0.4.2 ~ hotfix
 
 Fixes a regression of issue #54 on some systems.
+
 ## v0.4.1 ~ Patch
 
 Fixed issues 52 and 53 on GitHub and added test cases for each (Fixes contributed by @[Almenon](https://github.com/Almenon))
