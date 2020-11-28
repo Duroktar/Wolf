@@ -1,12 +1,13 @@
 import * as vscode from "vscode";
-import {
+import type {
   ExtensionContext,
+  ConfigurationChangeEvent,
   OutputChannel,
-  TextDocumentChangeEvent
+  TextDocumentChangeEvent,
 } from "vscode";
 
 import { wolfStandardApiFactory, WolfAPI } from "./api";
-import { ActiveTextEditorChangeEventResult } from "./types";
+import type { ActiveTextEditorChangeEventResult } from "./types";
 import { registerCommand } from "./helpers";
 import { clamp } from "./utils";
 
@@ -78,7 +79,7 @@ export function activate(context: ExtensionContext): WolfAPI {
     }
   }
 
-  function changedConfiguration(event: vscode.ConfigurationChangeEvent): void {
+  function changedConfiguration(event: ConfigurationChangeEvent): void {
     if (
       event.affectsConfiguration("wolf.pawPrintsInGutter") ||
       event.affectsConfiguration("wolf.updateFrequency") ||
@@ -88,18 +89,12 @@ export function activate(context: ExtensionContext): WolfAPI {
     }
   }
 
-  function clearThrottleUpdateBuffer(): void {
-    if (updateTimeout) {
-      clearTimeout(updateTimeout);
-    }
-  }
-
   function throttledHandleDidChangeTextDocument(
     event: TextDocumentChangeEvent
   ): void {
     clearThrottleUpdateBuffer()
     updateTimeout = setTimeout(
-      () => wolfAPI.handleDidChangeTextDocument(event.document),
+      () => wolfAPI.traceAndSetDecorationsUsingTempFile(event.document),
       clamp(100, 10000, wolfAPI.updateFrequency ?? Infinity)
     );
   }
@@ -108,5 +103,10 @@ export function activate(context: ExtensionContext): WolfAPI {
     throttledHandleDidChangeTextDocument({
       document: wolfAPI.activeEditor.document
     } as TextDocumentChangeEvent);
+  }
+
+  function clearThrottleUpdateBuffer(): void {
+    if (updateTimeout)
+      clearTimeout(updateTimeout);
   }
 }

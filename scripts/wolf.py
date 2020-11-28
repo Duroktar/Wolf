@@ -83,15 +83,6 @@ def script_path(script_dir):
     sys.path.remove(script_dir)
 
 
-def get_line_from_file(_file, lineno):
-    with open(_file) as fs:
-        lines = fs.readlines()
-    if lineno <= len(lines):
-        return lines[lineno - 1]
-    else:
-        return ""
-
-
 def try_deepcopy(obj):
     """ 
         Deepcopy can throw a type error when sys modules are to be
@@ -102,6 +93,10 @@ def try_deepcopy(obj):
         return deepcopy(obj)
     except (TypeError, AttributeError):
         return obj
+
+
+def contains_any(*args):
+    return any(i in args[-1] for i in args[:-1])
 
 
 ###################
@@ -141,10 +136,6 @@ def try_deepcopy(obj):
 WOLF = []
 COUNTER = 1
 #########
-
-
-def contains_any(*args):
-    return any(i in args[-1] for i in args[:-1])
 
 
 def resultifier(value):
@@ -482,6 +473,7 @@ def main(filename, test = False):
         try:
             os.remove(full_path)
         except PermissionError:
+            # NBD, this can fail on Windows CI tests..
             pass
         finally:
             return res 

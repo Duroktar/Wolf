@@ -1,4 +1,4 @@
-import {
+import type {
   DecorationOptions,
   Range,
   TextEditor,
@@ -28,10 +28,10 @@ export interface WolfLineDecoration {
   data: string[];
   lineno: number;
   error: boolean;
-  loop: boolean;
-  source: string;
+  loop?: boolean;
+  source?: string;
   pretty: string[];
-  calls: number;
+  calls?: number;
 }
 
 export interface WolfDecorationMapping {
@@ -46,19 +46,12 @@ export interface WolfDecorationOptions {
   language?: "python" | string;
 }
 
-export interface WolfDecorationMoveOptions {
-  start: number;
-  end?: number;
-  swap?: boolean;
-  step?: number;
-}
-
 export interface WolfStandardDecorationTypes {
   success: TextEditorDecorationType;
   error: TextEditorDecorationType;
 }
 
-export interface WolfSessionDecorations {
+export interface WolfDecorations {
   success: DecorationOptions[];
   error: DecorationOptions[];
 }
@@ -74,15 +67,15 @@ export interface WolfTraceLineResult {
   _loop?: boolean;
 }
 
-export type WolfParsedTraceResults = WolfTraceLineResult[] | null;
+export type WolfParsedTraceResults = WolfTraceLineResult[] | null | undefined;
+export type TracerParsedResultTuple = [WolfParsedTraceResults, string]
 
 export interface WolfTracerInterface {
   pythonPath: string;
   fileName: string;
   rootDir: string;
-  afterInstall: () => void;
-  onData: (WolfParsedTraceResults: WolfTraceLineResult[] | undefined) => void;
-  onError: (message?: string) => void;
 }
 
 export type ActiveTextEditorChangeEventResult = TextEditor | undefined;
+
+export type WolfEvent = 'decorations-changed';

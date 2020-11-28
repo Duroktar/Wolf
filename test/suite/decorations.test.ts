@@ -12,24 +12,17 @@ import { openAndShowTextDocument } from "./helpers";
 
 suite("Extension Tests", () => {
 	test("Should generate decorations", async () => {
-
-    await openAndShowTextDocument(join(__dirname, '..', '..', 'test', 'test.py'));
-
     const started = vscode.extensions.getExtension("trabpukcip.wolf");
     const api: WolfAPI = await started?.activate()
-
-    assert.strictEqual(api.decorations.hasDecoratons, false, 'Decorations present too early');
-
-    const documentText = api.activeEditor.document.getText();
-    assert.notStrictEqual(documentText, '', 'Test file is empty')
-
+    
     return new Promise(resolve => {
       api.on('decorations-changed', () => {
-        assert.strictEqual(api.decorations.hasDecoratons, true, 'No decorations')
+        assert.strictEqual(api.decorations.hasDecorations, true, 'No decorations')
         resolve()
       })
 
-      api.stepInWolf()
+      openAndShowTextDocument(join(__dirname, '..', '..', 'test', 'test.py'))
+        .then(() => api.stepInWolf())
     })
 	}).timeout(30000); // This can sometimes take awhile on CI servers.
 });
