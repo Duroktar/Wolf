@@ -1,6 +1,5 @@
-import { TextEditor, TextDocument } from "vscode";
-import { WolfActiveSessionCollection } from "./types";
-import { getActiveEditor } from "./helpers";
+import type { TextEditor, TextDocument } from "vscode";
+import type { WolfActiveSessionCollection } from "./types";
 
 export function wolfSessionStoreFactory(): WolfSessionController {
   return new WolfSessionController();
@@ -10,24 +9,11 @@ export class WolfSessionController {
   private _sessions: WolfActiveSessionCollection = {};
 
   public clearAllSessions(): void {
-    this._sessions = {} as WolfActiveSessionCollection;
-  }
-
-  public clearSessionByName(name: string): void {
-    delete this._sessions[name];
+    this._sessions = {};
   }
 
   public createSessionFromEditor(editor: TextEditor): void {
     this._sessions[editor.document.fileName] = editor;
-  }
-
-  public getActiveSession(): TextEditor {
-    const activeEditor = getActiveEditor();
-    return this._sessions[activeEditor.document.fileName];
-  }
-
-  public getAllSessions(): WolfActiveSessionCollection {
-    return this._sessions;
   }
 
   public getSessionByFileName(fileName: string): TextEditor {
@@ -35,15 +21,7 @@ export class WolfSessionController {
   }
 
   public sessionIsActiveByDocument(document: TextDocument): boolean {
-    return this._sessions[document.fileName] ? true : false;
-  }
-
-  public sessionIsActiveByFileName(fileName: string): boolean {
-    return this._sessions[fileName] ? true : false;
-  }
-
-  public get collection(): WolfActiveSessionCollection {
-    return this._sessions;
+    return !!this._sessions[document.fileName];
   }
 
   public get sessionNames(): string[] {

@@ -33,14 +33,12 @@ export function wolfStandardApiFactory(
   context: ExtensionContext,
   options: { output: OutputChannel }
 ): WolfAPI {
-  const wolfOutputChannel = wolfOutputFactory(options.output);
-
   return new WolfAPI(
     context,
-    wolfOutputChannel,
+    wolfOutputFactory(options.output),
     wolfDecorationStoreFactory(context),
     wolfSessionStoreFactory(),
-    pythonTracerFactory(wolfOutputChannel),
+    pythonTracerFactory(),
   );
 }
 
@@ -122,12 +120,12 @@ export class WolfAPI {
     }
   };
 
-  private onPythonDataSuccess = (data: TracerParsedResultTuple): void => {
-    this.parsePythonDataAndSetDecorations(this.activeEditor, data[0]);
+  private onPythonDataSuccess = ([data, stdout]: TracerParsedResultTuple): void => {
+    this.parsePythonDataAndSetDecorations(this.activeEditor, data);
     if (this.printLogging) {
-      const output = this.prettyPrintWolfData(data[0]);
+      const output = this.prettyPrintWolfData(data);
       this._outputController.clear();
-      this.logToOutput(data[1] ? data[1] + '\n\n' : '');
+      this.logToOutput(stdout ? stdout + '\n\n' : '');
       this.logToOutput(`(Wolf Output): ${JSON.stringify(output, null, 4)}`);
       this.logToOutput(`\n\nTotal Line Count: ${data?.length}`);
     }

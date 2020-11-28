@@ -1,4 +1,4 @@
-import {
+import type {
   DecorationOptions,
   Range,
   TextEditor,
@@ -28,10 +28,10 @@ export interface WolfLineDecoration {
   data: string[];
   lineno: number;
   error: boolean;
-  loop: boolean;
-  source: string;
+  loop?: boolean;
+  source?: string;
   pretty: string[];
-  calls: number;
+  calls?: number;
 }
 
 export interface WolfDecorationMapping {
@@ -44,13 +44,6 @@ export interface WolfDecorationOptions {
   hoverText: string;
   color: WolfColorSelection;
   language?: "python" | string;
-}
-
-export interface WolfDecorationMoveOptions {
-  start: number;
-  end?: number;
-  swap?: boolean;
-  step?: number;
 }
 
 export interface WolfStandardDecorationTypes {

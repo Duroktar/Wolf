@@ -1,18 +1,13 @@
 import * as path from "path";
 import { spawn } from "child_process"
-import { indexOrLast } from "./helpers";
-import { WolfOutputController } from "./output";
-import { WolfTracerInterface, TracerParsedResultTuple } from "./types";
+import { indexOrLast } from "./utils";
+import type { WolfTracerInterface, TracerParsedResultTuple } from "./types";
 
-export function pythonTracerFactory(output: WolfOutputController): PythonTracer {
-  return new PythonTracer(output);
+export function pythonTracerFactory(): PythonTracer {
+  return new PythonTracer();
 }
 
 export class PythonTracer {
-  constructor(
-    private outputPanel: WolfOutputController,
-    private displayPythonOutput = true
-  ) { }
 
   public tracePythonScript = async (
     options: WolfTracerInterface,
@@ -20,12 +15,12 @@ export class PythonTracer {
     return new Promise((resolve, reject) => {
       const { fileName, pythonPath, rootDir } = options
 
-      if (this.timeout !== null) {
-        clearTimeout(this.timeout)
+      if (this.tracerTimeout !== null) {
+        clearTimeout(this.tracerTimeout)
       }
   
       const python = this.getPythonRunner(pythonPath, rootDir, fileName);
-      this.timeout = setTimeout(function () { python.kill() }, 10 * 1000);
+      this.tracerTimeout = setTimeout(function () { python.kill() }, 10 * 1000);
   
       python.stderr.on("data", (data: Buffer) => {
         reject(data.toString());
@@ -49,7 +44,7 @@ export class PythonTracer {
     })
   }
 
-  private timeout: null | NodeJS.Timeout = null;
+  private tracerTimeout: null | NodeJS.Timeout = null;
 
   private getPythonRunner(pythonPath: string, rootDir: string, scriptName: string) {
     const wolfPath: string = path.join(rootDir, "scripts/wolf.py");

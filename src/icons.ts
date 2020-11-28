@@ -1,5 +1,5 @@
-import { WolfColorSelection, WolfIcon } from "./types";
-import { ExtensionContext } from "vscode";
+import type { ExtensionContext } from "vscode";
+import type { WolfColorSelection, WolfIcon } from "./types";
 import { wolfIconColorProvider } from "./colors";
 
 export function wolfIconProvider(
