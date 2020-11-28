@@ -181,7 +181,7 @@ def parse_eval(*args, **kw):
 
     try:
         rv = eval(*args)
-    except Exception as e:
+    except BaseException as e:
         if event['kind'] == 'line':
             thrown = traceback.format_exception_only(type(e), e)
             error = '\n'.join(thrown)
@@ -434,7 +434,7 @@ def main(filename, test = False):
 
         import_and_trace_script(module_name, full_path)
 
-    except Exception as e:
+    except BaseException as e:
 
         # If there's an error, we try to handle it and
         # send back data that can be used to decorate
