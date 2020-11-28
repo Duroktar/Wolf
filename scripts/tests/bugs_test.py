@@ -16,11 +16,11 @@ def test_bug_1():
     major = sys.version_info.major
     minor = sys.version_info.minor
 
-    if major == 3 and minor == 8:
-        assert res1 == '[]'
-        assert res2 != '[]'
-        assert res1 != res2
-    else:
+    if major == 3 and minor < 7:
         assert res1 != []
         assert res2 != []
         assert res1 == res2
+    else:
+        assert res1 == '[]'
+        assert res2 != '[]'
+        assert res1 != res2
