@@ -94,6 +94,20 @@
         }
       }
     ],
+    "keybindings": [
+      {
+        "command": "wolf.barkAtCurrentFile",
+        "key": "ctrl+shift+9",
+        "mac": "cmd+shift+9",
+        "when": "!inWolfContext && !inQuickOpen && !terminalFocus && editorLangId == python"
+      },
+      {
+        "command": "wolf.stopBarking",
+        "key": "ctrl+shift+9",
+        "mac": "cmd+shift+9",
+        "when": "!inQuickOpen && !terminalFocus && inWolfContext"
+      }
+    ],
     "menus": {
       "touchBar": [
         {
