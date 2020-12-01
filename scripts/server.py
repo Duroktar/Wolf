@@ -40,7 +40,7 @@ loop = asyncio.get_event_loop()
 
 
 def server_log(path: str, message):
-    print(f"[{datetime.now().isoformat()}] path={path} -- {message}")
+    print("[" + datetime.now().isoformat() + "] path=" + path + " -- " + message)
 
 def res_200(response: str, path: str):
     return json.dumps({ "statusCode" : 200, "path": path, "output": response })
@@ -76,7 +76,7 @@ def process_raw_source(websocket, source: str, path: str):
 
 
 async def handler(websocket: websockets.WebSocketClientProtocol, path: str):
-    server_log(path, 'Client Connected')
+    server_log(path, "Client Connected")
     try:
 
         while True:
@@ -87,14 +87,14 @@ async def handler(websocket: websockets.WebSocketClientProtocol, path: str):
 
             if data['raw'] == True:
                 source = data['data']
-                server_log(path, f"Tracing Script")
+                server_log(path, "Tracing Script")
                 args = (pool, process_raw_source, websocket, source, path)
                 response, stop = await loop.run_in_executor(*args)
                 await websocket.send(res_200_eof(response, path))
 
             elif data['filepath']:
                 filepath = data['filepath']
-                server_log(path, f"Tracing File: {filepath}")
+                server_log(path, "Tracing File: " + filepath)
                 args = (pool, process_python_script, websocket, filepath)
                 response, stop = await loop.run_in_executor(*args)
                 await websocket.send(res_200_eof(response, path))
@@ -108,14 +108,14 @@ async def handler(websocket: websockets.WebSocketClientProtocol, path: str):
     except websockets.exceptions.ConnectionClosed:
         server_log(path, "Client Disconnected")
     except websockets.exceptions.WebSocketException as e:
-        server_log(path, f"SOCKET ERROR: {e}")
+        server_log(path, "SOCKET ERROR: " + str(e))
     except Exception as e:
-        server_log(path, f"SERVER ERROR: {e}")
+        server_log(path, "SERVER ERROR: " + str(e))
         await websocket.send(res_500(path))
 
 
 if __name__ == "__main__":
-    print(f'[{datetime.now().isoformat()}] Wolf Tracing Server Started @ http://{wolf_host}:{wolf_port}/')
+    print("[" + datetime.now().isoformat() + "] Wolf Tracing Server Started @ http://" + wolf_host + ":" + wolf_port + "/")
     start_server = websockets.serve(handler, wolf_host, wolf_port)
 
     loop.run_until_complete(start_server)
