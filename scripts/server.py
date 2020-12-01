@@ -32,7 +32,7 @@ from wolf import Wolf
 
 
 wolf_host = os.environ.get('WOLF_SERVER_INTERFACE', '0.0.0.0')
-wolf_port = int(os.environ.get('WOLF_SERVER_PORT', 9879))
+wolf_port = os.environ.get('WOLF_SERVER_PORT', '9879')
 
 
 pool = concurrent.futures.ThreadPoolExecutor((os.cpu_count() or 1))
@@ -116,7 +116,7 @@ async def handler(websocket: websockets.WebSocketClientProtocol, path: str):
 
 if __name__ == "__main__":
     print("[" + datetime.now().isoformat() + "] Wolf Tracing Server Started @ http://" + wolf_host + ":" + wolf_port + "/")
-    start_server = websockets.serve(handler, wolf_host, wolf_port)
+    start_server = websockets.serve(handler, wolf_host, int(wolf_port))
 
     loop.run_until_complete(start_server)
     loop.run_forever()

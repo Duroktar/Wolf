@@ -120,6 +120,9 @@ export class WolfAPI {
             if (not(session.isLiveEditing)) {
               this.decorations.set(session, pythonData);
               this.decorations.renderTo(this.activeEditor, session);
+
+              this._logger.debug('decorations-changed')
+              this.emit('decorations-changed', document.fileName);
             }
             else {
               const { fileName } = session.editor.document;
@@ -133,8 +136,6 @@ export class WolfAPI {
               this.logToOutput(`\n\nTotal Line Count: ${pythonData?.length}`);
             }
           }
-
-          this.emit('decorations-changed', document.fileName);
         })
 
         wolfClient.on('error', (err: Error) => {
@@ -206,7 +207,7 @@ export class WolfAPI {
     event: T.WolfEvent,
     listener: (...args: unknown[]) => void,
   ): void => {
-    this._eventEmitter.addListener(event, listener)
+    this._eventEmitter.on(event, listener)
   }
 
   public get activeEditor(): vscode.TextEditor {
