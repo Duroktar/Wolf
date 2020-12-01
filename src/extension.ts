@@ -10,7 +10,7 @@ export function activate(context: vscode.ExtensionContext): WolfAPI {
   const wolfAPI = wolfStandardApiFactory(context, { output });
   let updateTimeout: null | NodeJS.Timeout = null;
 
-  if (not(Boolean(process.env.WOLF_TEST_SESSION)))
+  if (not(Boolean(process.env.WOLF_TEST_SESSION ?? process.env.CI)))
     wolfAPI.startServer();
 
   context.subscriptions.push(
