@@ -28,9 +28,7 @@ export class WolfAPI {
     private _decorations: WolfDecorationsController,
     private _sessions: WolfSessionController,
     private _server: WolfServerDaemon,
-  ) {
-    this._server.start(this.pythonPath, this.rootExtensionDir);
-  }
+  ) {}
 
   public stepInWolf = (isLiveEditing = false): void => {
     const logMessage = isLiveEditing ? 'in Live Mode' : '';
@@ -90,7 +88,7 @@ export class WolfAPI {
       .then(() => {
         // TODO: Move handlers into a proper Disposable class
         this._logger.debug('Tracing')
-        
+
         const session = this.sessions.get(document)
 
         this._output.clear();
@@ -105,7 +103,7 @@ export class WolfAPI {
               const line = parseAndValidateResponse(result);
               this.decorations.setDataAtLine(session.decorations, line)
               this.decorations.renderTo(this.activeEditor, session);
-  
+
               const filepath = this.activeEditor.document.uri.path;
               this.emit('decorations-updated', filepath, this.decorations);
             }
@@ -120,7 +118,7 @@ export class WolfAPI {
 
           if (this.isWolfSession(document)) { // TODO: Move handlers into a proper Disposable class
             const pythonData = parseAndValidateEofResponse(result);
-  
+
             if (not(session.isLiveEditing)) {
               this.decorations.set(session, pythonData);
               this.decorations.renderTo(this.activeEditor, session);
@@ -133,7 +131,7 @@ export class WolfAPI {
               const message = `Wolf:\n"${fileName}" Exited\n`;
               vscode.window.showInformationMessage(message);
             }
-  
+
             if (this.printLogging) {
               const output = this.prettyPrintWolfTraceData(pythonData);
               this.logToOutput(`(Wolf Output): ${JSON.stringify(output, null, 4)}`);
@@ -148,7 +146,7 @@ export class WolfAPI {
           if (this.isWolfSession(document)) { // TODO: Move handlers into a proper Disposable class
             this._logger.debug('Error')
             this._logger.error(err)
-  
+
             if (this.shouldOutputErrors)
               this.logToOutput("(Wolf Error):", err.message ?? '<no message>');
           }
@@ -303,6 +301,10 @@ export class WolfAPI {
 
   public stopServer = (): void => {
     this._server.stop()
+  };
+
+  public startServer = (): void => {
+    this._server.start(this.pythonPath, this.rootExtensionDir);
   };
 
   private get decorations(): WolfDecorationsController {

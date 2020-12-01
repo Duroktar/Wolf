@@ -4,36 +4,31 @@
 //
 
 import * as assert from "assert";
+import { before } from 'mocha';
 
 import * as vscode from "vscode";
 import { WolfAPI } from "../../src/api";
 
 suite("Extension Tests", () => {
+  let api: WolfAPI
+  let extension: vscode.Extension<WolfAPI>
+
+  before(async () => {
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    extension = vscode.extensions.getExtension("trabpukcip.wolf")!;
+    api = await extension?.activate();
+  })
+
 	test("Should provide extension @wolf", async () => {
-    const started = vscode.extensions.getExtension("trabpukcip.wolf");
-    
-    assert.notStrictEqual(started, undefined, 'Extension not started');
+    assert.notStrictEqual(extension, undefined, 'Extension not started');
   });
-  
+
 	test("Should activate extension @wolf", async () => {
-
-    const started = vscode.extensions.getExtension("trabpukcip.wolf");
-
-    const api: WolfAPI = await started?.activate()
-    api.stopServer();
-
     assert.notStrictEqual(api, undefined, 'No Wolf API');
-
-    assert.strictEqual(started?.isActive, true, 'Extension not active');
+    assert.strictEqual(extension?.isActive, true, 'Extension not active');
 	});
-  
+
 	test("Should use Python 3", async () => {
-
-    const started = vscode.extensions.getExtension("trabpukcip.wolf");
-
-    const api: WolfAPI = await started?.activate()
-    api.stopServer();
-
     const pyVersion = await api.getPythonVersion()
     const [majorVersion, minorVersion] = pyVersion.split('.')
 

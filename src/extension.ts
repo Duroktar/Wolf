@@ -10,6 +10,9 @@ export function activate(context: vscode.ExtensionContext): WolfAPI {
   const wolfAPI = wolfStandardApiFactory(context, { output });
   let updateTimeout: null | NodeJS.Timeout = null;
 
+  if (not(Boolean(process.env.WOLF_TEST_SESSION)))
+    wolfAPI.startServer();
+
   context.subscriptions.push(
     registerCommand("wolf.barkAtCurrentFileLive", startWolfLiveMode),
     registerCommand("wolf.barkAtCurrentFile", startWolfNormal),
@@ -83,7 +86,7 @@ export function activate(context: vscode.ExtensionContext): WolfAPI {
   ): void {
     if (not(wolfAPI.isWolfSession(event.document)))
       return
-    
+
     if (not(wolfAPI.isLiveEditing(event.document)))
       throttledHandleDidChangeTextDocument(event);
   }

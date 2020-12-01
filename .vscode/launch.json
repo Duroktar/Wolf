@@ -66,6 +66,9 @@
       "type": "extensionHost",
       "request": "launch",
       "runtimeExecutable": "${execPath}",
+      "env": {
+        "WOLF_TEST_SESSION": "true"
+      },
       "args": [
         "--disable-extensions",
         "--extensionDevelopmentPath=${workspaceFolder}",
