@@ -1,5 +1,5 @@
 
-name: Node.js CI
+name: MacOS CI
 
 on:
   push:

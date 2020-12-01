@@ -1,5 +1,5 @@
 
-name: Node.js CI
+name: Windows CI
 
 on:
   push:
