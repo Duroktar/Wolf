@@ -25,5 +25,5 @@ suite("Extension Tests", () => {
       openAndShowTextDocument(join(__dirname, '..', '..', 'test', 'test.py'))
         .then(() => api.stepInWolf())
     })
-	}).timeout(30000); // This can sometimes take awhile on CI servers.
+	}).timeout(60000); // This can sometimes take awhile on CI servers.
 });

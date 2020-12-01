@@ -13,7 +13,7 @@ export class WolfClient {
     public identifier: string,
   ) {}
 
-  public connect(retry = 5, wait = 100): Promise<void> {
+  public connect(retry = 10, wait = 100): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       this._logger.debug('Connecting')
 
@@ -25,7 +25,7 @@ export class WolfClient {
         if (connectionError && retry > 0)   {
           this._logger.debug(`... Retrying in ${wait}ms`)
           setTimeout(() => {
-            resolve(this.connect(retry - 1, clampBelow(1000, wait * 2)))
+            resolve(this.connect(retry - 1, clampBelow(1500, wait * 2)))
           }, wait)
         }
         else if (connectionError && retry === 0) {
