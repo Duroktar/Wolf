@@ -133,6 +133,8 @@ export class WolfAPI {
               this.logToOutput(`\n\nTotal Line Count: ${pythonData?.length}`);
             }
           }
+
+          this.emit('decorations-changed', document.fileName);
         })
 
         wolfClient.on('error', (err: Error) => {
