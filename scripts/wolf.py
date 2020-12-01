@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 r""" Wolf - It kicks the Quokkas ass.
       .-"-.
      / /|  \                     _  __
