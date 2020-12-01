@@ -1,279 +1,310 @@
 import * as fs from "fs";
-import {
-  WolfDecorationsController,
-  wolfDecorationStoreFactory
-} from "./decorations";
-import {
-  WolfDecorations,
-  WolfParsedTraceResults,
-  TracerParsedResultTuple,
-  WolfEvent,
-} from "./types";
-import {
-  commands,
-  extensions,
-  ExtensionContext,
-  OutputChannel,
-  TextDocumentChangeEvent,
-  TextDocument,
-  TextEditor,
-  workspace,
-  WorkspaceConfiguration,
-} from "vscode";
-import { WolfSessionController, wolfSessionStoreFactory } from "./sessions";
-import { PythonTracer, pythonTracerFactory } from "./tracer";
-import { getActiveEditor, makeTempFile } from "./helpers";
-import { hotModeWarning } from "./hotWarning";
-import { wolfOutputFactory, WolfOutputController } from "./output";
+import * as vscode from "vscode";
+import type * as T from "./types";
 import { EventEmitter } from "events";
 import { platform } from "os";
+import { spawn } from "child_process";
+import { WolfSessionController } from "./sessions";
+import { WolfDecorationsController } from "./decorations";
+import { WolfOutputController } from "./output";
 import { WolfError } from "./errors";
+import { consoleLoggerFactory, wolfClientFactory } from "./factories";
+import { fileIdentifier, getActiveEditor, makeTempFile } from "./helpers";
+import { parseAndValidateResponse, parseAndValidateEofResponse } from "./helpers";
+import { nameOf, not } from "./utils";
+import { WolfClient } from "./client";
 
-export function wolfStandardApiFactory(
-  context: ExtensionContext,
-  options: { output: OutputChannel }
-): WolfAPI {
-  return new WolfAPI(
-    context,
-    wolfOutputFactory(options.output),
-    wolfDecorationStoreFactory(context),
-    wolfSessionStoreFactory(),
-    pythonTracerFactory(),
-  );
-}
 
 export class WolfAPI {
+  private _logger = consoleLoggerFactory(nameOf(WolfAPI))
   private _changedConfigFlag = false;
-  private _endOfFile = 0;
+  private _clients = new Array<WolfClient>()
   private _eventEmitter = new EventEmitter()
 
   constructor(
-    public context: ExtensionContext,
-    private _outputController: WolfOutputController,
-    private _decorationController: WolfDecorationsController,
-    private _sessionController: WolfSessionController,
-    private _pythonTracer: PythonTracer
+    private context: vscode.ExtensionContext,
+    private _output: WolfOutputController,
+    private _decorations: WolfDecorationsController,
+    private _sessions: WolfSessionController,
   ) { }
 
-  public stepInWolf = (): void => {
-    this.decorations.setDefaultDecorationOptions("green", "red");
-    this.sessions.createSessionFromEditor(this.activeEditor);
-    this.updateLineCount(this.activeEditor.document.lineCount);
-    this.traceAndSetDecorations(this.activeEditor.document.fileName);
+  public stepInWolf = (isLiveEditing = false): void => {
+    const logMessage = isLiveEditing ? 'in Live Mode' : '';
+    this._logger.debug(`Starting ${logMessage}`)
+    this.sessions.create({
+      ...this.decorations.init(isLiveEditing),
+      editor: this.activeEditor,
+      isLiveEditing,
+    });
+    this.traceAndSetDecorations();
     this.enterWolfContext();
   };
 
   public stopWolf = (): void => {
-    this.clearAllSessionsAndDecorations();
+    this._logger.debug('Stopping')
+    this.decorations.clearFor(
+      this.activeEditor,
+      this.activeSession,
+    );
+    this.sessions.deleteFor(this.activeEditor);
+    this.stopClient(this.activeEditor.document);
     this.exitWolfContext();
   };
 
-  public traceAndSetDecorationsUsingTempFile = (document: TextDocument): void => {
-    const tempFileObj = makeTempFile(document.fileName);
-    fs.writeFileSync(tempFileObj.name, document.getText());
-    this.traceAndSetDecorations(tempFileObj.name)
-      .finally(tempFileObj.removeCallback);
+  public stopSession = (document: vscode.TextDocument): void => {
+    this._logger.debug('Stopping')
+    this.sessions.deleteByName(document.fileName);
+    this.stopClient(document);
+    this.exitWolfContext();
+  };
+
+  public clearAll = (): void => {
+    this._logger.debug('Clearing Decorations')
+    for (const name of this.sessions.names) {
+      const session = this.sessions.getByFileName(name);
+      this.decorations.clear(session);
+    }
+    this._logger.debug('Clearing Sessions')
+    this.sessions.clearAll();
+  };
+
+  public traceAndSetDecorations = (
+    textDocument?: vscode.TextDocument,
+  ): void => {
+    const document = textDocument ?? this.activeEditor.document;
+
+    const tempfile = makeTempFile(document.fileName);
+    fs.writeFileSync(tempfile.name, document.getText());
+
+    const clientPath = fileIdentifier(document);
+    const wolfClient = wolfClientFactory(clientPath);
+
+    this._clients.push(wolfClient);
+
+    wolfClient
+      .connect()
+      .then(() => {
+        // TODO: Move handlers into a proper Disposable class
+        this._logger.debug('Tracing')
+        
+        const session = this.sessions.get(document)
+
+        this._output.clear();
+
+        wolfClient.traceRawSrc(document.getText())
+
+        if (session.isLiveEditing)
+          wolfClient.on('data', (result: T.WolfClientDataResponse) => {
+            if (this.isWolfSession(document)) { // TODO: Move handlers into a proper Disposable class
+              this._logger.debug('Received new data')
+
+              const line = parseAndValidateResponse(result);
+              this.decorations.setDataAtLine(session.decorations, line)
+              this.decorations.renderTo(this.activeEditor, session);
+  
+              const filepath = this.activeEditor.document.uri.path;
+              this.emit('decorations-updated', filepath, this.decorations);
+            }
+          })
+
+        wolfClient.on('eof', (result: T.WolfClientEofResponse) => {
+          this._logger.debug('Reached EOF');
+
+          tempfile.removeCallback();
+
+          this.stopClient(session.editor.document);
+
+          if (this.isWolfSession(document)) { // TODO: Move handlers into a proper Disposable class
+            const pythonData = parseAndValidateEofResponse(result);
+  
+            if (not(session.isLiveEditing)) {
+              this.decorations.set(session, pythonData);
+              this.decorations.renderTo(this.activeEditor, session);
+            }
+            else {
+              const { fileName } = session.editor.document;
+              const message = `Wolf:\n"${fileName}" Exited\n`;
+              vscode.window.showInformationMessage(message);
+            }
+  
+            if (this.printLogging) {
+              const output = this.prettyPrintWolfTraceData(pythonData);
+              this.logToOutput(`(Wolf Output): ${JSON.stringify(output, null, 4)}`);
+              this.logToOutput(`\n\nTotal Line Count: ${pythonData?.length}`);
+            }
+          }
+        })
+
+        wolfClient.on('error', (err: Error) => {
+          tempfile.removeCallback()
+
+          if (this.isWolfSession(document)) { // TODO: Move handlers into a proper Disposable class
+            this._logger.debug('Error')
+            this._logger.error(err)
+  
+            if (this.shouldOutputErrors)
+              this.logToOutput("(Wolf Error):", err.message ?? '<no message>');
+          }
+        })
+
+        wolfClient.on('close', () => {
+          this._logger.debug('Closing')
+
+          tempfile.removeCallback()
+        })
+      })
+      .catch(() => tempfile.removeCallback())
+  };
+
+  public reRenderDecorations = (): void => {
+    this._logger.debug('re-rendering')
+    this.decorations.renderTo(
+      this.activeEditor,
+      this.sessions.get(this.activeEditor.document),
+    );
+  }
+
+  public isLiveEditing = (
+    document: vscode.TextDocument,
+  ): boolean => {
+    return this.sessions.isLiveEditing(document);
+  };
+
+  public isWolfSession = (
+    document: vscode.TextDocument,
+  ): boolean => {
+    return this.sessions.isActive(document);
   };
 
   public enterWolfContext = (): void => {
-    commands.executeCommand("setContext", "inWolfContext", true);
+    vscode.commands.executeCommand("setContext", "inWolfContext", true);
   };
 
   public exitWolfContext = (): void => {
-    commands.executeCommand("setContext", "inWolfContext", false);
+    vscode.commands.executeCommand("setContext", "inWolfContext", false);
   };
 
-  public clearDecorations = (session: TextEditor): void => {
-    const emptyDecorations = this.decorations.getEmptyDecorations();
-    this.setDecorations(session, emptyDecorations);
-  };
-
-  public clearAllDecorations = (): void => {
-    this.decorations.reInitDecorationCollection();
-    for (const name of this.sessions.sessionNames) {
-      const session = this.sessions.getSessionByFileName(name);
-      this.clearDecorations(session);
-    }
-  };
-
-  public clearAllSessionsAndDecorations = (): void => {
-    this.clearAllDecorations();
-    this.sessions.clearAllSessions();
-  };
-
-  public isDocumentWolfSession = (document: TextDocument): boolean => {
-    return this.sessions.sessionIsActiveByDocument(document);
-  };
-
-  private prettyPrintWolfData(data: WolfParsedTraceResults): string[] {
-    return data?.map(
-      l =>
-        `LINENO: ${l.lineno} - VALUE: ${l.value}${
-        l.error ? `, ERROR: ${l.error}` : ""
-        }`
-    ) ?? [];
-  }
-
-  private onPythonDataError = (data?: string): void => {
-    if (this.shouldLogErrors) {
-      this.logToOutput("(Wolf Error):", data ?? '<no message>');
-    }
-  };
-
-  private onPythonDataSuccess = ([data, stdout]: TracerParsedResultTuple): void => {
-    this.parsePythonDataAndSetDecorations(this.activeEditor, data);
-    if (this.printLogging) {
-      const output = this.prettyPrintWolfData(data);
-      this._outputController.clear();
-      this.logToOutput(stdout ? stdout + '\n\n' : '');
-      this.logToOutput(`(Wolf Output): ${JSON.stringify(output, null, 4)}`);
-      this.logToOutput(`\n\nTotal Line Count: ${data?.length}`);
-    }
-    const filepath = this.activeEditor.document.uri.path;
-    this.emit('decorations-changed', filepath, this.decorations);
-  };
-
-  private parsePythonDataAndSetDecorations = (
-    session: TextEditor,
-    data: WolfParsedTraceResults = []
-  ) => {
-    this.decorations.reInitDecorationCollection();
-    this.decorations.prepareParsedPythonData(data);
-    this.clearDecorations(session);
-    this.setPreparedDecorations(session);
-  };
-
-  private setPreparedDecorations = (session: TextEditor): void => {
-    this.decorations.setPreparedDecorationsForEditor(session);
-    const decorations = this.decorations.getPreparedDecorations();
-    this.setDecorations(session, decorations);
-  };
-
-  private setDecorations = (
-    session: TextEditor,
-    decorations: WolfDecorations
-  ): void => {
-    const decorationTypes = this.decorations.getDecorationTypes();
-    if (decorationTypes) {
-      session.setDecorations(decorationTypes.success, decorations.success);
-      session.setDecorations(decorationTypes.error, decorations.error);
-    }
-  };
-
-  private traceAndSetDecorations = (fileName: string): Promise<void> => {
-    return this.tracer.tracePythonScript({
-      fileName,
-      pythonPath: this.pythonPath,
-      rootDir: this.rootExtensionDir,
-    })
-      .then(this.onPythonDataSuccess)
-      .catch(this.onPythonDataError)
-  };
-
-  private updateLineCount = (count: number): void => {
-    this.oldLineCount = count;
-  };
-
-  public updateStickysHot = (event: TextDocumentChangeEvent): void => {
-    if (this.isHot) {
-      this.setPreparedDecorations(this.activeEditor);
-      this.updateLineCount(event.document.lineCount);
-    }
-    this.activeEditor.document.save();
-  };
-
-  public setConfigUpdatedFlag(v: boolean): void {
-    this._changedConfigFlag = v;
-  }
-
-  public displayHotModeWarning(): void {
-    hotModeWarning();
+  public setChangedConfigFlag(value: boolean): void {
+    this._changedConfigFlag = value;
   }
 
   public logToOutput = (...text: string[]): void => {
-    this._outputController.log(text.join(" "));
+    this._output.log(text.join(" "));
   };
 
-  public emit = (event: WolfEvent, filepath: string, ...args: unknown[]): void => {
+  public emit = (
+    event: T.WolfEvent,
+    filepath: string,
+    ...args: unknown[]
+  ): void => {
     this._eventEmitter.emit(event, filepath, ...args)
   }
 
-  public on = (event: WolfEvent, listener: (...args: unknown[]) => void): void => {
+  public on = (
+    event: T.WolfEvent,
+    listener: (...args: unknown[]) => void,
+  ): void => {
     this._eventEmitter.addListener(event, listener)
   }
 
-  public get activeEditor(): TextEditor {
+  public get activeEditor(): vscode.TextEditor {
     return getActiveEditor();
+  }
+
+  public get activeSession(): T.WolfSession {
+    const editor = getActiveEditor();
+    return this.sessions.get(editor.document);
   }
 
   public get activeEditorIsDirty(): boolean {
     return this.activeEditor.document.isDirty;
   }
 
-  public get config(): WorkspaceConfiguration {
-    return workspace.getConfiguration("wolf");
+  public get activeEditorHasDecorations(): boolean {
+    const session = this.sessions.get(this.activeEditor.document)
+    return Object.keys(session.decorations).length > 0
   }
 
   public get configChanged(): boolean {
     return this._changedConfigFlag;
   }
 
-  public get decorations(): WolfDecorationsController {
-    return this._decorationController;
-  }
-
-  public get isHot(): boolean | undefined {
-    return this.config.get<boolean>("hot");
-  }
-
   public get updateFrequency(): number | undefined {
     return this.config.get<number>("updateFrequency");
-  }
-
-  public get oldLineCount(): number {
-    return this._endOfFile;
-  }
-
-  public set oldLineCount(v: number) {
-    this._endOfFile = v;
   }
 
   public get printLogging(): boolean | undefined {
     return this.config.get<boolean>("printLoggingEnabled");
   }
 
-  public get rootExtensionDir(): string {
-    const res = extensions.getExtension("traBpUkciP.wolf")?.extensionPath;
-    if (res === undefined)
-      throw new WolfError('no WolfAPI.rootExtensionDir)')
-    return res
+  public get updateOnSaveOnly(): boolean {
+    return this.config.get<boolean>("updateOnSaveOnly") === false;
   }
 
-  public get sessions(): WolfSessionController {
-    return this._sessionController;
-  }
-
-  public get shouldLogErrors(): boolean {
+  public get shouldOutputErrors(): boolean {
     return this.config.get<boolean>("logErrors") === true;
   }
 
-  public get shouldShowHotModeWarning(): boolean {
-    return this.config.get<boolean>("disableHotModeWarning") !== true;
+  public get rootExtensionDir(): string {
+    const res = vscode.extensions.getExtension("traBpUkciP.wolf");
+    if (res?.extensionPath === undefined)
+      throw new WolfError('no WolfAPI.rootExtensionDir)');
+    return res.extensionPath;
   }
-
-  public get tracer(): PythonTracer {
-    return this._pythonTracer;
-  }
-
-  private __platform = platform().trim()
 
   public get pythonPath(): string {
     const fromconfig = this.config.get<string>("pythonPath")
     /* Github-Actions Windows CI tests don't like 'python3' */
-    return fromconfig || this.__platform === "win32" ? 'python' : 'python3'
+    return fromconfig || this.__platform === "win32" ? 'python' : 'python3';
   }
 
-  public getPythonMajorVersion = async (): Promise<string> => {
-    return await this.tracer.getPythonMajorVersion(this.pythonPath)
+  public getPythonMajorVersion(): Promise<string> {
+    const child = spawn(this.pythonPath, ['--version']);
+    return new Promise((resolve, reject) => {
+      child.stderr.on('data', err => {
+        reject(err);
+      })
+      child.stdout.on('data', (data: Buffer) => {
+        resolve(data.toString().split(' ')[1].split('.')[0]);
+      })
+    })
   }
+
+  private prettyPrintWolfTraceData = (
+    data: T.WolfTraceLineResult[] = [],
+  ): string[] => {
+    return data.map(
+      l =>
+        `LINENO: ${l.lineno} - VALUE: ${l.value}${
+        l.error ? `, ERROR: ${l.error}` : ""
+        }`
+    );
+  }
+
+  private stopClient(document: vscode.TextDocument): void {
+    const wolfClient = this._clients
+      .find(o => o.identifier === document.fileName)
+
+    if (wolfClient == null)
+      return
+
+    wolfClient.close()
+
+    this._clients = this._clients
+      .filter(o => o !== wolfClient)
+  }
+
+  private get decorations(): WolfDecorationsController {
+    return this._decorations;
+  }
+
+  private get sessions(): WolfSessionController {
+    return this._sessions;
+  }
+
+  private get config(): vscode.WorkspaceConfiguration {
+    return vscode.workspace.getConfiguration("wolf");
+  }
+
+  private __platform = platform().trim();
 }

@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 r""" Wolf - It kicks the Quokkas ass.
       .-"-.
      / /|  \                     _  __
@@ -48,7 +50,7 @@ from hunter import trace
 # single variable, we want that. Etc..
 #
 # NOTE: See https://regex101.com/r/sf6nAH/15 for more info
-WOLF_MACROS = re.compile(
+WOLF_REGEX = re.compile(
     r"^(?!pass\s+|from\s+|import\s+|return\s+|continue\s+|if\s+|for\s+)((?P<variable>\w+)$|^(print\((?P<print>.+)\))|^(?P<macro_source>(?P<local>[^\d\W]+\s)*((?P<assignment>\=)?(?P<operator>\+\=|\-\=|\*\=|\\\=)* *)*(?P<macro>[\w\{\[\(\'\"].+)\#\s?\?[^\n]*))")
 
 # XXX: For parsing hunter.CodePrinter output see:
@@ -101,7 +103,7 @@ def contains_any(*args):
 
 ###################
 #
-# Wolf Internal API
+# Wolf Python API
 #                                 __
 #                               .d$$b
 #                             .' TO$;\
@@ -128,359 +130,381 @@ def contains_any(*args):
 #                               ;`-
 #                              :\
 #                              ;  bug
+class Wolf:
+    def __init__(self):
+        # WOLF[dict]: Results from each line trace
+        self.WOLF = []
+        self.listeners = []
 
 
-# -% Globals %-
-#
-# WOLF[dict]: Results from each line trace
-WOLF = []
-COUNTER = 1
-#########
+    def add_listener(self, listener):
+        self.listeners.append(listener)
 
+    def remove_listener(self, listener):
+        self.listeners.remove(listener)
 
-def resultifier(value):
-    # Here we can set the string representation
-    # of the result. For example, callables are
-    # simply converted to their string repr. None
-    # is converted to "None". And anything else
-    # is pretty formatted to a string.
-    #
-    #   ie: def add(a, b): return a + b
-    #
-    #   Will (usually) be represented as:
-    #       <function add at 0x7f768395ad95>
-    #
-    #########
-    if isinstance(value, bool):
-        return str(value)
-    if callable(value):
-        return repr(value)
-    if value is None:
-        return 'None'
-    return str(value)
 
+    def result_handler(self, event):
+        """
+            Called by `trace` to handle any actions post
+            filter. ie: trace => filter => result_handler
+        """
 
-def wolf_formats():
-    # It's important that we create an output that can be handled
-    # by the javascript `JSON.parse(...)` function.
-    results = (json.dumps(i) for i in WOLF if contains_any(
-        'value', i.keys()) or i['error'])
-    python_data = ", ".join(results)
+        # We don't want any whitespace around our
+        # source code that could mess up the parser.
+        source = event['source'].strip()
 
-    return "[" + python_data + "]"
-
-def wolf_prints():
-    # DO NOT TOUCH, ie: no pretty printing
-    print("WOOF: " + wolf_formats())  # <--  Wolf result
-    ######################################
-
-
-def parse_eval(*args, **kw):
-    global WOLF
-    event = kw.get('event')
-
-    try:
-        rv = eval(*args)
-    except BaseException as e:
-        if event['kind'] == 'line':
-            thrown = traceback.format_exception_only(type(e), e)
-            error = '\n'.join(thrown)
-            source = event['source'].strip()
-            metadata = OrderedDict([
-                ("lineno",              event['lineno']),
-                ("source",                       source),
-                ("value",                     thrown[0]),
-                ("error",                         error),
-                # ("filename",          event['filename']),
-            ])
-
-            WOLF.append(metadata)
-            wolf_prints()
-            sys.exit(0)
-    else:
-        return rv
-
-
-def result_handler(event):
-    """
-        Called by the `trace` function to handle any actions post
-        filter. ie: trace => filter => result_handler
-
-        Side Effects: Results are appended to the global WOLF list.
-    """
-
-    # XXX: WARNING, SIDE EFFECTS MAY INCLUDE:
-    global WOLF
-
-    # NOTE: Consider refactoring this using
-    #      class variables instead of globals.
-
-    # We don't want any whitespace around our
-    # source code that could mess up the parser.
-    source = event['source'].strip()
-
-    # These are the fields returned from each line
-    # of the traced program. This is essentially
-    # the metadata returned to the extension in the
-    # WOLF list.
-    metadata = OrderedDict([
-        ("lineno",             event['lineno']),
-        # "value"    <-  Defined below MAYBE..
-    ])
-
-    # The annotation will take on this value
-    # (if present).
-    value = None
-
-    # We'll need to look up any values in the
-    # correct scope, so let's grab the locals
-    # and globals from the current frame to
-    # use later on.
-    _globals = event['globals']
-    _locals = event['locals']
-
-    # This regex does all the heavy lifting. Check out
-    # https://regex101.com/r/npWf6w/5 for an example of
-    # # how it works.
-    match = WOLF_MACROS.search(source)
-
-    # Sometimes we have to skip an entry to prevent dupes
-    skip = False
-
-    # Regex match groups are used for convenience.
-    if source not in ['pass', 'break', 'continue'] and match: # fixes https://github.com/Duroktar/Wolf/issues/28 to 30
-
-        # TODO: We should be using the ast instead of regex for all cases.
-        tree = ast.parse(source)
-
-        # Simplest case.
-        if match.group('variable'):
-            if event.kind != 'call':
-                value = parse_eval(match.group('variable'),
-                                   _globals, _locals, event=event)
-                metadata["source"] = event['source'],
-            else:
-                skip = True
-
-        # A little magic to parse print args
-        elif match.group('print'):
-            buffer = io.StringIO()
-            src_seg = unparse(tree).strip()
-            try:
-                to_eval = "print({}, file=wolf__buffer__)".format(src_seg[6:-1]) # fixes https://github.com/Duroktar/Wolf/issues/34
-                exec(to_eval, _globals, {**_locals, 'wolf__buffer__': buffer})
-                value = str(buffer.getvalue()).strip('\n')
-            finally:
-                buffer.close()
-
-        # Macros require a few more steps..
-        elif match.group('macro'):
-
-            # XXX: This is to help avoid side effects when evaluating expressions
-            m_locals_copy = {k: try_deepcopy(v) for k, v in _locals.items()}
-            m_globals_copy = {k: try_deepcopy(v) for k, v in _globals.items()}
-
-            if isinstance(tree.body[0], ast.Assign):
-                node = tree.body[0]
-
-                if hasattr(node, 'target'):
-                    target = node.target
-                else:
-                    target = node.targets[0]
-
-                # Get the variable name
-                local_name = target.id
-
-                if isinstance(tree.body[0], ast.AugAssign):
-                    operator = {'Mult': '*=', 'Add': '+=', 'Sub': '-=', 'Div': '/='}[node.op]
-
-                    # This get the value of the local variable from earlier
-                    left_side_value = parse_eval(local_name, m_globals_copy, m_locals_copy, event=event)
-
-                    # This evaluates the statement with the infixed operator
-                    value = parse_eval("{} {} {}".format(left_side_value, operator, value), event=event)
-                else:
-                    # Basic macro to evaluate
-                    value = parse_eval(source[source.index('=')+1:].strip(), m_globals_copy, m_locals_copy, event=event)
-
-                # Make sure to display the output as a variable assignment
-                value = "{} = {}".format(local_name, value)
-
-            else:
-                # Basic macro evaluation
-                value = parse_eval(match.group('macro').strip(), m_globals_copy, m_locals_copy, event=event)
-        else:
-            # Basic macro evaluation
-            value = parse_eval(match.group('macro').strip(), m_globals_copy, m_locals_copy, event=event)
-
-        # Final results are formatted
-        metadata['value'] = resultifier(value)
-
-        if not skip and event.kind not in ['return', 'call']:
-            # And lastly, update our WOLF results list
-            WOLF.append(metadata)
-
-
-def filename_filter(filename):
-    """
-        Removes dependency noise from the output. We're only
-        interested in code paths travelled by the target script,
-        so this filter traces based on the filename, provided as
-        a prop on the `event` dict.
-
-        NOTE: `filename_filter` is a closure over the actual filtering
-            function. It captures the target filename for injection
-            into the inner scope when the filter is actually run.
-    """
-    return lambda event: bool(event['filename'] == filename)
-
-
-def import_and_trace_script(module_name, module_path):
-    """
-        As the name suggests, this imports and traces the target script.
-
-        Filters for the running script and delegates the resulting calls
-        to the result_handler function.
-
-        NOTE: script_path is necessary here for relative imports to work
-    """
-    with script_path(os.path.abspath(os.path.dirname(module_path))):
-        with trace(filename_filter(module_path), action=result_handler):
-            import_file(module_name, module_path)
-
-def test(snippet):
-    """
-        TODO
-    """
-    from tempfile import mkstemp
-
-    testdir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tests')
-    tmpfile_path = mkstemp(suffix=".py", text=True)[1]
-    full_path = os.path.abspath(tmpfile_path)
-    tmpfile_name = os.path.basename(tmpfile_path).split('.')[0]
-    filename = os.path.basename(tmpfile_path)
-
-    with open(full_path, 'a', encoding="utf-8") as the_file:
-        the_file.write(snippet.strip() + '\n')
-
-    return main(full_path, test=True) 
-
-
-def main(filename, test = False):
-    """
-        Simply ensures the target script exists and calls
-        the import_and_trace_script function. The results
-        are stored in the global WOLF variable which are
-        stringified and outputted to the console on script
-        completion.
-
-        We follow convention by returning a proper (hm...)
-        `exit` code to the shell, so the actual return data
-        requires some parsing on the client side. Tags are
-        used to simplify this.
-
-        Tag list (tags are the capitalized text):
-
-        On Failure:
-
-            `There can be multiple points of failure.
-
-            -> `IMPORT_ERROR:`  Happens if `hunter` dependency not found.
-
-            -> `ARGS_ERROR:`    Happens if no target script provided.
-
-            -> `EXISTS_ERROR:`  Happens if the target file doesn't exist.
-
-            -> `RUNTIME_ERROR:` Captures runtime errors from the main function.
-
-            -> `THREAD_ERROR:` Captures errors from the Windows timeout thread.
-
-        On success:
-
-            -> `WOOF:` a string search for this tag returns the
-                starting index `i` of the resulting data. This
-                can then be sliced from index `i + 5` to get a
-                JSON parsable string representation.
-
-                Ex:
-
-                    $ python wolf.py /some/path/to/script.py
-                    ...
-                    WOOF: [{...}, {...}, ...]
-
-                This is always the last item of the result, so
-                you need not worry about an ending slice index.
-
-                NOTE: May return wrong index if parsing the script
-                for Home Alone. /jk
-
-        XXX: This script can now be debugged from VS-Code. Simply choose
-        `wolf.py Debug Session` from the list to start debugging with the
-        `./test.py` selected as input automatically.
-    """
-    if not os.path.exists(filename):
-        message = "EXISTS_ERROR: " + filename + " doesn't exist"
-        print(message, file=sys.stderr)
-        return 1
-
-    # The full path to the script (including filename and extension)
-    full_path = os.path.abspath(filename)
-
-    # The `import`able name of the target file
-    # ie: /home/duroktar/scripts/my_script.py  ->  my_script
-    module_name = os.path.basename(full_path).split('.')[0]
-
-    try:
-
-        import_and_trace_script(module_name, full_path)
-
-    except BaseException as e:
-
-        # If there's an error, we try to handle it and
-        # send back data that can be used to decorate
-        # the offending line.
-
-        value = traceback.format_exception_only(type(e), e)[0]
-
-        if isinstance(e, SyntaxError):
-            lineno = getattr(e, 'lineno')
-            value = e.msg
-            source = e.line
-        else:
-            _, _, exc_traceback = sys.exc_info()
-            tb = traceback.extract_tb(exc_traceback)[-1]
-            for i in traceback.extract_tb(exc_traceback):
-                if i.filename == filename:
-                    tb = i
-            lineno = tb.lineno
-            source = tb.line
-
+        # These are the fields returned from each line
+        # of the traced program. This is essentially
+        # the metadata returned to the extension in the
+        # WOLF list.
         metadata = OrderedDict([
-            ("lineno",          lineno),
-            # ("filename",   tb.filename),
-            ("source",  source.strip()),
-            ("value",            value),
-            ("error",             True),
+            ("lineno",             event['lineno']),
+            # "value"    <-  Defined below MAYBE..
         ])
 
-        # And tack the error on to the end of the response.
-        WOLF.append(metadata)
+        # The annotation will take on this value
+        # (if present).
+        value = None
 
-    # handle testing
-    if test:
-        res = wolf_formats()
-        WOLF.clear()
+        # We'll need to look up any values in the
+        # correct scope, so let's grab the locals
+        # and globals from the current frame to
+        # use later on.
+        _globals = event['globals']
+        _locals = event['locals']
+
+        # This regex does all the heavy lifting. Check out
+        # https://regex101.com/r/npWf6w/5 for an example of
+        # # how it works.
+        match = WOLF_REGEX.search(source)
+
+        # Sometimes we have to skip an entry to prevent dupes
+        skip = False
+
+        # Regex match groups are used for convenience.
+        if source not in ['pass', 'break', 'continue'] and match: # fixes https://github.com/Duroktar/Wolf/issues/28 to 30
+
+            # TODO: We should be using the ast instead of regex for all cases.
+            tree = ast.parse(source)
+
+            # Simplest case.
+            if match.group('variable'):
+                if event.kind != 'call':
+                    value = self.parse_eval(match.group('variable'),
+                                    _globals, _locals, event=event)
+                    metadata["source"] = event['source'],
+                else:
+                    skip = True
+
+            elif match.group('print'):
+                buffer = io.StringIO()
+                try:
+                    # A little magic to parse print args (fixes https://github.com/Duroktar/Wolf/issues/34)
+                    src_seg = unparse(tree).strip()
+                    to_eval = "print({}, file=wolf__buffer__)".format(src_seg[6:-1])
+                    exec(to_eval, _globals, {**_locals, 'wolf__buffer__': buffer})
+                    value = str(buffer.getvalue()).strip('\n')
+                finally:
+                    buffer.close()
+
+            # Macros require a few more steps..
+            elif match.group('macro'):
+
+                # XXX: This is to help avoid side effects when evaluating expressions
+                m_locals_copy = {k: try_deepcopy(v) for k, v in _locals.items()}
+                m_globals_copy = {k: try_deepcopy(v) for k, v in _globals.items()}
+
+                if isinstance(tree.body[0], ast.Assign):
+                    node = tree.body[0]
+
+                    if hasattr(node, 'target'):
+                        target = node.target
+                    else:
+                        target = node.targets[0]
+
+                    # Get the variable name
+                    local_name = target.id
+
+                    if isinstance(tree.body[0], ast.AugAssign):
+                        operator = {'Mult': '*=', 'Add': '+=', 'Sub': '-=', 'Div': '/='}[node.op]
+
+                        # This get the value of the local variable from earlier
+                        left_side_value = self.parse_eval(local_name, m_globals_copy, m_locals_copy, event=event)
+
+                        # This evaluates the statement with the infixed operator
+                        value = self.parse_eval("{} {} {}".format(left_side_value, operator, value), event=event)
+                    else:
+                        right_side_value = source[source.index('=')+1:].strip()
+                        # Basic macro to evaluate
+                        value = self.parse_eval(right_side_value, m_globals_copy, m_locals_copy, event=event)
+
+                    # Make sure to display the output as a variable assignment
+                    value = "{} = {}".format(local_name, value)
+
+                else:
+                    # Basic macro evaluation
+                    value = self.parse_eval(match.group('macro').strip(), m_globals_copy, m_locals_copy, event=event)
+            else:
+                # Basic macro evaluation
+                value = self.parse_eval(match.group('macro').strip(), m_globals_copy, m_locals_copy, event=event)
+
+            # Final results are formatted
+            metadata['value'] = self.resultifier(value)
+
+            if not skip and event.kind not in ['return', 'call']:
+                # And lastly, update our WOLF results list
+                self.emit_line(metadata)
+
+
+    def parse_eval(self, *args, **kw):
+        event = kw.get('event')
+
         try:
-            os.remove(full_path)
-        except PermissionError:
-            # NBD, this can fail on Windows CI tests..
-            pass
-        finally:
-            return res 
+            rv = eval(*args)
+        except BaseException as e:
+            if event['kind'] == 'line':
+                thrown = traceback.format_exception_only(type(e), e)
+                error = '\n'.join(thrown)
+                source = event['source'].strip()
+                metadata = OrderedDict([
+                    ("lineno",              event['lineno']),
+                    ("source",                       source),
+                    ("value",                     thrown[0]),
+                    ("error",                         error),
+                    # ("filename",          event['filename']),
+                ])
 
-    # print the results and return a 0 for the exit code
-    wolf_prints()
-    return 0
+                self.emit_line(metadata)
+                self.wolf_prints()
+                sys.exit(0)
+        else:
+            return rv
+
+
+    def emit_line(self, metadata):
+        self.WOLF.append(metadata)
+        for callback in self.listeners:
+            callback(metadata)
+
+
+    def wolf_formats(self):
+        # It's important that we create valid JSON output for the
+        # JS parser to handle.
+        results = (json.dumps(i) for i in self.WOLF if contains_any(
+            'value', i.keys()) or i['error'])
+        python_data = ", ".join(results)
+
+        return "[" + python_data + "]"
+
+
+    def wolf_prints(self):
+        # The output is prepended with 'WOOF: ' to mark
+        # the start of the JSON section.
+        print("WOOF: " + self.wolf_formats())
+
+
+    def resultifier(self, value):
+        """
+            Here we can set the string representation
+            of the result. For example, callables are
+            simply converted to their string repr. None
+            is converted to "None". And anything else
+            is pretty formatted to a string.
+            
+                ie: def add(a, b): return a + b
+            
+                Will (usually) be represented as:
+                <function add at 0x7f768395ad95>
+        """
+        if isinstance(value, bool):
+            return str(value)
+        if callable(value):
+            return repr(value)
+        if value is None:
+            return 'None'
+        return str(value)
+
+
+    def filename_filter(self, filename):
+        """
+            Removes dependency noise from the output. We're only
+            interested in code paths travelled by the target script,
+            so this filter traces based on the filename, provided as
+            a prop on the `event` dict.
+
+            NOTE: `filename_filter` is a closure over the actual filtering
+                function. It captures the target filename for injection
+                into the inner scope when the filter is actually run.
+        """
+        return lambda event: bool(event['filename'] == filename)
+
+
+    def import_and_trace_script(self, module_name, module_path):
+        """
+            As the name suggests, this imports and traces the target script.
+
+            Filters for the running script and delegates the resulting calls
+            to the result_handler function.
+
+            NOTE: script_path is necessary here for relative imports to work
+        """
+        with script_path(os.path.abspath(os.path.dirname(module_path))):
+            with trace(self.filename_filter(module_path), action=self.result_handler):
+                import_file(module_name, module_path)
+
+
+    def test(self, snippet, strip = True):
+        """
+            Used internally for running unit tests.
+        """
+        from tempfile import mkstemp
+
+        testdir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tests')
+        tmpfile_path = mkstemp(suffix=".py", text=True)[1]
+        full_path = os.path.abspath(tmpfile_path)
+        tmpfile_name = os.path.basename(tmpfile_path).split('.')[0]
+        filename = os.path.basename(tmpfile_path)
+
+        with open(full_path, 'a', encoding="utf-8") as the_file:
+            the_file.write(snippet.strip() + '\n')
+
+        return self.run(full_path, test=True) 
+
+
+    def run_for_source(self, snippet):
+        """
+            Used to evaluate source code.
+        """
+        from tempfile import mkstemp
+
+        testdir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tests')
+        tmpfile_path = mkstemp(suffix=".py", text=True)[1]
+        full_path = os.path.abspath(tmpfile_path)
+        tmpfile_name = os.path.basename(tmpfile_path).split('.')[0]
+        filename = os.path.basename(tmpfile_path)
+
+        with open(full_path, 'a', encoding="utf-8") as the_file:
+            the_file.write(snippet)
+
+        return self.run(full_path, test=True) 
+
+
+    def run(self, filename, test = False):
+        """
+            Simply ensures the target script exists and calls
+            the import_and_trace_script function. The results
+            are stored in the global WOLF variable which are
+            stringified and outputted to the console on script
+            completion.
+
+            We follow convention by returning a proper (hm...)
+            `exit` code to the shell, so the actual return data
+            requires some parsing on the client side. Tags are
+            used to simplify this.
+
+            Tag list (tags are the capitalized text):
+
+            On Failure:
+
+                `There can be multiple points of failure.
+
+                -> `IMPORT_ERROR:`  Happens if `hunter` dependency not found.
+
+                -> `ARGS_ERROR:`    Happens if no target script provided.
+
+                -> `EXISTS_ERROR:`  Happens if the target file doesn't exist.
+
+                -> `RUNTIME_ERROR:` Captures runtime errors from the main function.
+
+                -> `THREAD_ERROR:` Captures errors from the Windows timeout thread.
+
+            On success:
+
+                -> `WOOF:` a string search for this tag returns the
+                    starting index `i` of the resulting data. This
+                    can then be sliced from index `i + 5` to get a
+                    JSON parsable string representation.
+
+                    Ex:
+
+                        $ python wolf.py /some/path/to/script.py
+                        ...
+                        WOOF: [{...}, {...}, ...]
+
+                    This is always the last item of the result, so
+                    you need not worry about an ending slice index.
+
+                    NOTE: May return wrong index if parsing the script
+                    for Home Alone.
+
+            XXX: This script can now be debugged from VS-Code. Simply choose
+            `wolf.py Debug Session` from the list to start debugging with the
+            `./test.py` selected as input automatically.
+        """
+        if not os.path.exists(filename):
+            message = "EXISTS_ERROR: " + filename + " doesn't exist"
+            print(message, file=sys.stderr)
+            return 1
+
+        # The full path to the script (including filename and extension)
+        full_path = os.path.abspath(filename)
+
+        # The `import`able name of the target file
+        # ie: /home/duroktar/scripts/my_script.py  ->  my_script
+        module_name = os.path.basename(full_path).split('.')[0]
+
+        try:
+
+            self.import_and_trace_script(module_name, full_path)
+
+        except BaseException as e:
+
+            # If there's an error, we try to handle it and
+            # send back data that can be used to decorate
+            # the offending line.
+
+            value = traceback.format_exception_only(type(e), e)[0]
+
+            if isinstance(e, SyntaxError):
+                lineno = getattr(e, 'lineno')
+                value = e.msg
+                source = e.line
+            else:
+                _, _, exc_traceback = sys.exc_info()
+                tb = traceback.extract_tb(exc_traceback)[-1]
+                for i in traceback.extract_tb(exc_traceback):
+                    if i.filename == filename:
+                        tb = i
+                lineno = tb.lineno
+                source = tb.line
+
+            metadata = OrderedDict([
+                ("lineno",          lineno),
+                # ("filename",   tb.filename),
+                ("source",  source.strip()),
+                ("value",            value),
+                ("error",             True),
+            ])
+
+            # And tack the error on to the end of the response.
+            self.emit_line(metadata)
+
+        # handle testing
+        if test:
+            res = self.wolf_formats()
+            self.WOLF.clear()
+            try:
+                os.remove(full_path)
+            except PermissionError:
+                # NBD, this can fail on Windows CI tests..
+                pass
+            finally:
+                return res 
+
+        # print the results and return a 0 for the exit code
+        self.wolf_prints()
+        return 0
 
 
 if __name__ == '__main__':
@@ -488,4 +512,4 @@ if __name__ == '__main__':
         print("ARGS_ERROR: Must provide a file to trace.")
         exit(1)
 
-    sys.exit(main(sys.argv[1]))
+    sys.exit(Wolf().run(sys.argv[1]))

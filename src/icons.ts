@@ -2,6 +2,7 @@ import type { ExtensionContext } from "vscode";
 import type { WolfColorSelection, WolfIcon } from "./types";
 import { wolfIconColorProvider } from "./colors";
 
+
 export function wolfIconProvider(
   context: ExtensionContext,
   color: WolfColorSelection,

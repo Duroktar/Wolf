@@ -1,128 +1,142 @@
-import {
-  DecorationOptions,
-  TextEditor,
-  TextEditorDecorationType,
-  window,
-  ExtensionContext,
-  Range,
-  Position,
-  workspace
-} from "vscode";
-import type {
-  WolfColorSelection,
-  WolfDecorationOptions,
-  WolfDecorationMapping,
-  WolfLineDecoration,
-  WolfDecorations,
-  WolfStandardDecorationTypes,
-  WolfTraceLineResult,
-  WolfParsedTraceResults,
-} from "./types";
+import * as vscode from "vscode";
+import type * as T from "./types";
+import { consoleLoggerFactory } from "./factories";
 import { wolfTextColorProvider } from "./colors";
 import { wolfIconProvider } from "./icons";
 import { formatWolfResponseElement } from "./helpers";
-import { clamp, stringEscape } from "./utils";
+import { clamp, nameOf, stringEscape } from "./utils";
 
 import { js as beautify } from "js-beautify";
 
-export function wolfDecorationStoreFactory(
-  context: ExtensionContext,
-): WolfDecorationsController {
-  return new WolfDecorationsController(context);
-}
 
 export class WolfDecorationsController {
-  private _decorations: WolfDecorationMapping = {};
-  private _decorationTypes: WolfStandardDecorationTypes | null = null;
-  private _preparedDecorations: WolfDecorations | null = null;
+  private _logger = consoleLoggerFactory(nameOf(WolfDecorationsController))
 
-  constructor(public context: ExtensionContext) {}
+  constructor(private context: vscode.ExtensionContext) {}
 
-  public getDecorationTypes = (): WolfStandardDecorationTypes | undefined => {
-    if (this._decorationTypes)
-      return this._decorationTypes;
+  public init = (liveMode?: boolean): T.WolfSessionInit => {
+    const decorationTypes = this.createDecorationTypes(
+      liveMode ? 'orange' : 'green'
+    );
+    return { decorationTypes, decorations: {} };
   };
 
-  public getEmptyDecorations = (): WolfDecorations => {
-    return { success: [], error: [] };
-  };
-
-  public getPreparedDecorations = (): WolfDecorations => {
-    if (this._preparedDecorations) {
-      return this._preparedDecorations;
-    } else {
-      return this.getEmptyDecorations();
-    }
-  };
-
-  public prepareParsedPythonData = (data: WolfParsedTraceResults): void => {
-    for (const line of data ?? []) {
-      this.setDecorationAtLine(line);
-    }
-  };
-
-  public reInitDecorationCollection = (): void => {
-    this._decorations = {};
-  };
-
-  public setDefaultDecorationOptions = (
-    successColor: WolfColorSelection,
-    errorColor: WolfColorSelection
+  public set = (
+    session: T.WolfSession,
+    lines: T.WolfTraceLineResult[] = [],
   ): void => {
-    this._decorationTypes = {
-      success: this.createGutterDecorations(successColor),
-      error: this.createGutterDecorations(errorColor),
+    session.decorations = lines.reduce((accum, line) => {
+      this.setDataAtLine(accum, line);
+      return accum
+    }, {})
+  };
+
+  public setDataAtLine = (
+    decorations: T.WolfDecorationMapping,
+    line: T.WolfTraceLineResult,
+  ): void => {
+    const lineNo = line.lineno;
+    const { data, pretty } = decorations[lineNo] ?? { data: [], pretty: [] };
+    const annotation = formatWolfResponseElement(line);
+
+    decorations[lineNo] = {
+      data: [...data, stringEscape(annotation)],
+      lineno: lineNo,
+      error: line.error ? true : false,
+      loop: line["_loop"],
+      pretty: [...(pretty ?? []), beautify(line.value, {
+        indent_size: 4,
+        space_in_empty_paren: true
+      })]
     };
   };
 
-  public setPreparedDecorationsForEditor = (editor: TextEditor): void => {
-    const decorations: DecorationOptions[] = [];
-    const errorDecorations: DecorationOptions[] = [];
-
-    Object.keys(this._decorations).forEach(key => {
-      const lineNo = parseInt(key, 10);
-      const lineIndex = lineNo - 1;
-      const decorationData = this.getDecorationAtLine(lineNo);
-
-      if (!decorationData.data || editor.document.lineCount < lineNo) {
-        return;
-      }
-
-      const textLine = editor.document.lineAt(lineIndex);
-      const source = textLine.text;
-      const decoRange = new Range(
-        new Position(lineIndex, textLine.firstNonWhitespaceCharacterIndex),
-        new Position(lineIndex, textLine.text.indexOf(source) + source.length)
-      );
-
-      const decoration = this.createWolfDecorationOptions({
-        range: decoRange,
-        text: decorationData.data.join(" => "), // This seperator should be adjustable from the config
-        hoverText: decorationData.pretty.join("\n"),
-        color: decorationData.error ? "red" : "cornflower"
-      });
-
-      if (decorationData.error)
-        errorDecorations.push(decoration)
-      else
-        decorations.push(decoration)
-    });
-
-    this._preparedDecorations = {
-      success: decorations,
-      error: errorDecorations
-    };
-  };
-
-  public get hasDecorations(): boolean {
-    return Object.keys(this._decorations).length > 0;
+  public render = (
+    session: T.WolfSession,
+  ): void => {
+    this.setEditorDecorations(
+      session.editor,
+      session.decorationTypes,
+      this.createWolfDecorations(session),
+    )
   }
 
+  public renderTo = (
+    editor: vscode.TextEditor,
+    session: T.WolfSession,
+  ): void => {
+    this.setEditorDecorations(
+      editor,
+      session.decorationTypes,
+      this.createWolfDecorations(session),
+    )
+  }
+
+  public clear = (
+    session: T.WolfSession,
+  ): void => {
+    this.setEditorDecorations(
+      session.editor,
+      session.decorationTypes,
+      this.getEmptyWolfDecorations(),
+    )
+  }
+
+  public clearFor = (
+    editor: vscode.TextEditor,
+    session: T.WolfSession,
+  ): void => {
+    this.setEditorDecorations(
+      editor,
+      session.decorationTypes,
+      this.getEmptyWolfDecorations(),
+    )
+  }
+
+  private setEditorDecorations = (
+    editor: vscode.TextEditor,
+    decorationTypes: T.WolfDecorationTypes,
+    decorations: T.WolfDecorations,
+  ): void => {
+    this._logger.debug('Rendering')
+    editor.setDecorations(decorationTypes.success, decorations.success);
+    editor.setDecorations(decorationTypes.error, decorations.error);
+  };
+
+  private createLineDecoration(
+    session: T.WolfSession,
+    lineno: string,
+  ): [vscode.DecorationOptions, T.WolfLineDecoration] | [] {
+    const { decorations, editor } = session
+    const line = parseInt(lineno, 10);
+    const lineIndex = line - 1;
+    const decorationData = decorations[line];
+
+    if (!decorationData.data || editor.document.lineCount < line) {
+      return [];
+    }
+
+    const textLine = editor.document.lineAt(lineIndex);
+    const source = textLine.text;
+    const decoRange = new vscode.Range(
+      new vscode.Position(lineIndex, textLine.firstNonWhitespaceCharacterIndex),
+      new vscode.Position(lineIndex, textLine.text.indexOf(source) + source.length)
+    );
+
+    const decoration = this.createWolfDecorationOptions({
+      range: decoRange,
+      text: decorationData.data.join(" => "), // TODO: This seperator should be adjustable from the config
+      hoverText: decorationData.pretty?.join("\n") ?? '',
+      color: decorationData.error ? "red" : "cornflower"
+    });
+
+    return [ decoration, decorationData ]
+  }
 
   private createWolfDecorationOptions = (
-    options: WolfDecorationOptions
-  ): DecorationOptions => {
-    const truncLength = workspace
+    options: T.WolfDecorationOptions
+  ): vscode.DecorationOptions => {
+    const truncLength = vscode.workspace
       .getConfiguration("wolf")
       .get<number>("maxLineLength") ?? 100;
     const textLength = options.text.length;
@@ -145,11 +159,21 @@ export class WolfDecorationsController {
     };
   };
 
+  private createDecorationTypes = (
+    successColor: T.WolfColorSelection = 'green',
+    errorColor: T.WolfColorSelection = 'red',
+  ): T.WolfDecorationTypes => {
+    return {
+      success: this.createGutterDecorations(successColor),
+      error: this.createGutterDecorations(errorColor),
+    };
+  };
+
   private createGutterDecorations = (
-    gutterIconColor: WolfColorSelection,
+    gutterIconColor: T.WolfColorSelection,
     leftMargin = 3
-  ): TextEditorDecorationType => {
-    return window.createTextEditorDecorationType({
+  ): vscode.TextEditorDecorationType => {
+    return vscode.window.createTextEditorDecorationType({
       after: {
         margin: `0 0 0 ${leftMargin}em`,
         textDecoration: "none"
@@ -158,42 +182,45 @@ export class WolfDecorationsController {
       rangeBehavior: 1,
       overviewRulerLane: 1,
       overviewRulerColor: wolfTextColorProvider(gutterIconColor),
-      gutterIconPath: wolfIconProvider(
-        this.context,
-        gutterIconColor,
-        this.pawprints
-      ),
+      gutterIconPath: wolfIconProvider(this.context, gutterIconColor, this.pawprints),
       gutterIconSize: "cover"
     });
   };
 
-  private getDecorationAtLine = (lineNo: number): WolfLineDecoration => {
-    return this._decorations[lineNo];
+  private createWolfDecorations = (
+    session: T.WolfSession,
+  ): T.WolfDecorations => {
+    this._logger.debug('Preparing')
+    const { decorations } = session
+
+    const prepared = {
+      success: [] as vscode.DecorationOptions[],
+      error: [] as vscode.DecorationOptions[],
+    }
+    
+    Object.keys(decorations).forEach(lineno => {
+      const [
+        vscodeDecoration,
+        wolfDecoration,
+      ] = this.createLineDecoration(session, lineno)
+
+      if (vscodeDecoration && wolfDecoration) {
+        if (wolfDecoration.error)
+          prepared.error.push(vscodeDecoration)
+        else
+          prepared.success.push(vscodeDecoration)
+      }
+    });
+
+    return prepared;
   };
 
-  private getDecorationAtLineOrDefault = (lineNo: number): WolfLineDecoration => {
-    return (this.getDecorationAtLine(lineNo) || { data: [], pretty: [] });
-  };
-
-  private setDecorationAtLine = (line: WolfTraceLineResult): void => {
-    const lineNo = line.lineno;
-    const { data, pretty } = this.getDecorationAtLineOrDefault(lineNo);
-    const annotation = formatWolfResponseElement(line);
-
-    this._decorations[lineNo] = {
-      data: [...data, stringEscape(annotation)],
-      lineno: lineNo,
-      error: line.error ? true : false,
-      loop: line["_loop"],
-      pretty: [...pretty, beautify(line.value, {
-        indent_size: 4,
-        space_in_empty_paren: true
-      })]
-    };
+  private getEmptyWolfDecorations = (): T.WolfDecorations => {
+    return { success: [], error: [] };
   };
 
   private get pawprints(): boolean {
-    return workspace
+    return vscode.workspace
       .getConfiguration("wolf")
       .get<boolean>("pawPrintsInGutter") ?? false;
   }

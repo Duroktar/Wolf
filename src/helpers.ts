@@ -1,12 +1,37 @@
 import * as path from "path";
 import * as vscode from "vscode";
-import type { WolfTraceLineResult } from "./types";
-import type { Disposable, TextEditor } from "vscode";
+import type * as T from "./types";
 
 import * as tmp from "tmp";
+import { assert } from "console";
+
+export function fileIdentifier(
+  document: vscode.TextDocument,
+): string | undefined {
+  return document.fileName.startsWith('/')
+    ? document.fileName.slice(1)
+    : document.fileName;
+}
+
+export function parseAndValidateEofResponse(
+  result: T.WolfClientEofResponse,
+): T.WolfTraceLineResult[] {
+  const totalOutput = JSON.parse(result.total_output);
+  assert(Array.isArray(totalOutput), 'Wolf trace results not an array.')
+  return totalOutput;
+}
+
+export function parseAndValidateResponse(
+  result: T.WolfClientDataResponse,
+): T.WolfTraceLineResult {
+  const parsedResponse = JSON.parse(result.output);
+  assert(typeof parsedResponse.lineno === 'number', 'Line number not defined')
+  assert(typeof parsedResponse.value !== 'undefined', 'Line value not defined')
+  return parsedResponse
+}
 
 export function formatWolfResponseElement(
-  element: WolfTraceLineResult
+  element: T.WolfTraceLineResult
 ): string {
   if (element.value || element.error) {
     if (Array.isArray(element.value)) {
@@ -25,7 +50,7 @@ export function formatWolfResponseElement(
   return '';
 }
 
-export function getActiveEditor(): TextEditor {
+export function getActiveEditor(): vscode.TextEditor {
   const activeEditor = vscode.window.activeTextEditor;
   if (activeEditor == null)
     throw new Error('No active TextEditor')
@@ -35,7 +60,7 @@ export function getActiveEditor(): TextEditor {
 export function registerCommand(
   cmdName: string,
   callBack: (...args: unknown[]) => unknown
-): Disposable {
+): vscode.Disposable {
   return vscode.commands.registerCommand(cmdName, callBack);
 }
 

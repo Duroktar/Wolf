@@ -9,15 +9,17 @@ import {
 const WolfIconColorMap = {
   blue: "blue",
   cornflower: "blue",
+  green: "green",
+  orange: "orange",
   red: "red",
-  green: "green"
 } as WolfIconColorType;
 
 const WolfHexColorMap = {
-  cornflower: "#6495ed",
   blue: "#00a1f1",
+  cornflower: "#6495ed",
   green: "#7cbb00",
-  red: "#ea2f36"
+  orange: "#ffae19",
+  red: "#ea2f36",
 } as WolfHexColorType;
 
 export function wolfIconColorProvider(color: WolfColorSelection): WolfIconColor {

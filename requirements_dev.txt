@@ -6,3 +6,4 @@ pytest-watch~=4.2.0
 pytest~=6.1.2
 rope~=0.10.7
 snapshottest~=0.6.0
+websockets~=8.1.0

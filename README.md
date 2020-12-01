@@ -92,11 +92,14 @@ Wolf is Good for:
 This extension contributes the following settings:
 
 * `wolf.barkAtCurrentFile`: Starts Wolf on the current file.
-* `wolf.stopBarking`: Stops all running Wolf sessions.
+* `wolf.stopBarking`: Stops running Wolf session.
 * `wolf.pawPrintsInGutter`: Use paw prints for gutter icons.
 * `wolf.maxLineLength`: The maximum length of line decorations. Lines longer than this are truncated (ex: 97, 98, 99, ... )
 * `wolf.printLoggingEnabled`: Enable Wolf console output (ie: the vscode terminal "output" section)
 * `wolf.updateFrequency`: Adjust the minimum timeframe before the file is saved during Hot Mode
+
+\*\*\* *NEW* \*\*\*
+* `wolf.barkAtCurrentFileLive`: Starts a streaming Wolf session on the current file (GUIs, games, etc..).
 
 ## FAQ
 

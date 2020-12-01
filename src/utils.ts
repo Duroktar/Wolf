@@ -3,6 +3,8 @@ export function clamp(blop: number, bloop: number, bleep: number): number {
   return bleep > bloop ? bloop : bleep < blop ? blop : bleep;
 }
 
+export const clampBelow = (limit: number, value: number): number => clamp(0, limit, value)
+
 export function indexOrLast(string: string, target: string): number {
   const idx = string.indexOf(target);
   return idx === -1 ? -1 : idx + target.length;
@@ -33,3 +35,10 @@ export function stringEscape(text: string | number): string {
     }
   });
 }
+
+export const randomString = (size = 7): string => Math.random().toString(36).substring(size);
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const nameOf = (obj: new (...args: any[]) => any): string => obj.name
+
+export const not = (val: unknown): boolean => !val
