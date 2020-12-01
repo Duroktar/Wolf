@@ -38,6 +38,6 @@ suite("Extension Tests", () => {
     const [majorVersion, minorVersion] = pyVersion.split('.')
 
     assert.strictEqual(Number(majorVersion), 3, 'Must be running Python major version 3')
-    assert.strictEqual(Number(minorVersion) > 6, true, 'Must be running Python 3.6 or higher')
+    assert.strictEqual(Number(minorVersion) > 5, true, 'Must be running Python 3.6 or higher')
 	});
 });
