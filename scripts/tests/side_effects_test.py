@@ -1,4 +1,5 @@
-from ..wolf import test as wolftest
+from ..wolf import Wolf
+wolftest = Wolf().test
 
 snippet = r"""
 b = [*range(1, 4)]  # ?  <-- Comment Macro ~ Result ->

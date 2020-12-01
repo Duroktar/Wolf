@@ -1,4 +1,5 @@
-from ..wolf import test as wolftest
+from ..wolf import Wolf
+wolftest = Wolf().test
 
 # Issues (#28,#29,#30): - https://github.com/Duroktar/Wolf/issues/28 https://github.com/Duroktar/Wolf/issues/29 https://github.com/Duroktar/Wolf/issues/30
 snippet = r"""

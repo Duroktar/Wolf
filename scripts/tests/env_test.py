@@ -1,4 +1,6 @@
-from ..wolf import test as wolftest
+from ..wolf import Wolf
+wolftest = Wolf().test
+
 from json import loads
 
 snippet = r"""

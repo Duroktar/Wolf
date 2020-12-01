@@ -1,4 +1,6 @@
-from ..wolf import test as wolftest
+from ..wolf import Wolf
+wolftest = Wolf().test
+
 import sys
 
 snippet1 = r"""
@@ -6,6 +8,7 @@ snippet1 = r"""
 
 1 < 0
 """
+
 snippet2 = r"""
 1 + 334  # ?  WORKS
 """
