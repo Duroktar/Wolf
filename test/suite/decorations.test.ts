@@ -18,6 +18,7 @@ suite("Extension Tests", () => {
     return new Promise(resolve => {
       api.on('decorations-changed', () => {
         assert.strictEqual(api.activeEditorHasDecorations, true, 'No decorations')
+        api.stopServer();
         resolve()
       })
 

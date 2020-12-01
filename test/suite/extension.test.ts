@@ -20,6 +20,8 @@ suite("Extension Tests", () => {
     const started = vscode.extensions.getExtension("trabpukcip.wolf");
 
     const api: WolfAPI = await started?.activate()
+    api.stopServer();
+
     assert.notStrictEqual(api, undefined, 'No Wolf API');
 
     assert.strictEqual(started?.isActive, true, 'Extension not active');
@@ -30,9 +32,12 @@ suite("Extension Tests", () => {
     const started = vscode.extensions.getExtension("trabpukcip.wolf");
 
     const api: WolfAPI = await started?.activate()
-    
-    const pyVersion = await api.getPythonMajorVersion()
+    api.stopServer();
 
-    assert.strictEqual(pyVersion, '3', 'Must be running Python major version 3')
+    const pyVersion = await api.getPythonVersion()
+    const [majorVersion, minorVersion] = pyVersion.split('.')
+
+    assert.strictEqual(Number(majorVersion), 3, 'Must be running Python major version 3')
+    assert.strictEqual(Number(minorVersion) > 6, true, 'Must be running Python 3.6 or higher')
 	});
 });

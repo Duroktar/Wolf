@@ -17,6 +17,7 @@ export function wolfStandardApiFactory(
     wolfOutputFactory(options.output),
     wolfDecorationStoreFactory(context),
     wolfSessionStoreFactory(),
+    wolfServerDaemonFactory()
   );
 }
 
@@ -39,15 +40,12 @@ export function wolfClientFactory(
 }
 
 export function wolfServerDaemonFactory(
-  wolfApi: WolfAPI,
   host = '0.0.0.0',
   port = '9879',
 ): WolfServerDaemon {
   return new WolfServerDaemon(
     host,
     port,
-    wolfApi.pythonPath,
-    wolfApi.rootExtensionDir,
   );
 }
 

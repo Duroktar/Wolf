@@ -13,6 +13,7 @@ import { fileIdentifier, getActiveEditor, makeTempFile } from "./helpers";
 import { parseAndValidateResponse, parseAndValidateEofResponse } from "./helpers";
 import { nameOf, not } from "./utils";
 import { WolfClient } from "./client";
+import { WolfServerDaemon } from "./server";
 
 
 export class WolfAPI {
@@ -26,7 +27,10 @@ export class WolfAPI {
     private _output: WolfOutputController,
     private _decorations: WolfDecorationsController,
     private _sessions: WolfSessionController,
-  ) { }
+    private _server: WolfServerDaemon,
+  ) {
+    this._server.start(this.pythonPath, this.rootExtensionDir);
+  }
 
   public stepInWolf = (isLiveEditing = false): void => {
     const logMessage = isLiveEditing ? 'in Live Mode' : '';
@@ -261,14 +265,14 @@ export class WolfAPI {
     return fromconfig || this.__platform === "win32" ? 'python' : 'python3';
   }
 
-  public getPythonMajorVersion(): Promise<string> {
+  public getPythonVersion(): Promise<string> {
     const child = spawn(this.pythonPath, ['--version']);
     return new Promise((resolve, reject) => {
       child.stderr.on('data', err => {
         reject(err);
       })
       child.stdout.on('data', (data: Buffer) => {
-        resolve(data.toString().split(' ')[1].split('.')[0]);
+        resolve(data.toString().split(' ')[1]);
       })
     })
   }
@@ -296,6 +300,10 @@ export class WolfAPI {
     this._clients = this._clients
       .filter(o => o !== wolfClient)
   }
+
+  public stopServer = (): void => {
+    this._server.stop()
+  };
 
   private get decorations(): WolfDecorationsController {
     return this._decorations;

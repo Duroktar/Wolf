@@ -85,7 +85,7 @@ Wolf is Good for:
 ## Requirements
 
 * Visual Studio Code
-* Python 3.5 - 3.8 (tested on 3.5, 3.6, and 3.8)
+* Python 3.6 - 3.9 (tested on 3.6, 3.7, 3.8, and 3.9)
 
 ## Extension Settings
 

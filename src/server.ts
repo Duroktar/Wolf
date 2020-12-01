@@ -1,22 +1,19 @@
 import * as path from 'path';
 import { ChildProcessWithoutNullStreams, spawn } from 'child_process';
-import { Disposable } from 'vscode';
 import { consoleLoggerFactory } from './factories';
 import { nameOf } from './utils';
 
 
-export class WolfServerDaemon implements Disposable {
+export class WolfServerDaemon {
   private _logger = consoleLoggerFactory(nameOf(WolfServerDaemon))
   public constructor(
     private host: string,
     private port: string,
-    private pythonPath: string,
-    private rootDir: string,
   ) { }
 
-  public start = (): this => {
+  public start = (pythonPath: string, rootDir: string): this => {
     this._logger.log('Starting')
-    this._service = this.getWolfRunner(this.pythonPath, this.rootDir)
+    this._service = this.getWolfRunner(pythonPath, rootDir)
     this._service.on('close', this.onClose)
     this._service.on('disconnect', this.onDisconnect)
     this._service.on('error', this.onError)
@@ -36,12 +33,8 @@ export class WolfServerDaemon implements Disposable {
     this._service?.off('message', this.onMessage)
     this._service?.stderr.off('data', this.onStderr)
     this._service?.stdout.off('data', this.onStdout)
-    return this
-  }
-
-  public dispose = (): void => {
-    this.stop()
     this._service?.kill()
+    return this
   }
 
   private onStderr = (data: Buffer) => this._logger.error('[onStderr]', data?.toString())

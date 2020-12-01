@@ -74,7 +74,7 @@
       "outFiles": [
         "${workspaceFolder}/out/test/**/*.js"
       ],
-      "preLaunchTask": "tsc: build - tsconfig.json"
+      "preLaunchTask": "npm: pretest"
     }
   ]
 }

@@ -55,7 +55,7 @@
         },
         "wolf.pythonPath": {
           "type": "string",
-          "description": "A different path to python - MUST be version 3.5 or greater"
+          "description": "A different path to python - MUST be version 3.6 or greater"
         }
       }
     },

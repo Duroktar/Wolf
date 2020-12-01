@@ -3,13 +3,12 @@ import { ActiveTextEditorChangeEventResult } from "./types";
 import { WolfAPI } from "./api";
 import { registerCommand } from "./helpers";
 import { clamp, not } from "./utils";
-import { wolfStandardApiFactory, wolfServerDaemonFactory } from "./factories";
+import { wolfStandardApiFactory } from "./factories";
 
 export function activate(context: vscode.ExtensionContext): WolfAPI {
   const output = vscode.window.createOutputChannel("Wolf");
   const wolfAPI = wolfStandardApiFactory(context, { output });
   let updateTimeout: null | NodeJS.Timeout = null;
-  wolfServerDaemonFactory(wolfAPI).start(),
 
   context.subscriptions.push(
     registerCommand("wolf.barkAtCurrentFileLive", startWolfLiveMode),
