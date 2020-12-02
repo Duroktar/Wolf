@@ -13,6 +13,9 @@ on:
 
 jobs:
   build:
+    strategy:
+      matrix:
+        python-version: [3.6, 3.7, 3.8, 3.9]
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
@@ -26,10 +29,10 @@ jobs:
     - name: Install NodeJS Dependencies
       run: yarn install
 
-    - name: Set up Python 3.6
+    - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
       with:
-        python-version: 3.6
+        python-version: ${{ matrix.python-version }}
 
     - name: Run Tests (Linux w/xvfb)
       run: xvfb-run -a npm test
