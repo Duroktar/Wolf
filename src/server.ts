@@ -18,6 +18,7 @@ export class WolfServerDaemon {
     this._service.on('disconnect', this.onDisconnect)
     this._service.on('error', this.onError)
     this._service.on('exit', this.onExit)
+    this._service.on('spawn', this.onSpawn)
     this._service.on('message', this.onMessage)
     this._service.stderr.on('data', this.onStderr)
     this._service.stdout.on('data', this.onStdout)
@@ -40,11 +41,12 @@ export class WolfServerDaemon {
   private onStderr = (data: Buffer) => this._logger.error('[onStderr]', data?.toString())
   private onStdout = (data: Buffer) => this._logger.info('[onStdout]', data?.toString())
 
-  private onClose = (data: Buffer) => this._logger.debug('[onClose]', data?.toString())
-  private onDisconnect = (data: Buffer) => this._logger.debug('[onDisconnect]', data?.toString())
-  private onError = (data: Buffer) => this._logger.debug('[onError]', data?.toString())
-  private onExit = () => this._logger.debug('[onExit]')
-  private onMessage = (data: Buffer) => this._logger.debug('[onMessage]', data?.toString())
+  private onSpawn = () => this._logger.debug('[onSpawn] child process spawned')
+  private onClose = (code?: number, sig?: string) => this._logger.debug('[onClose] code:', code, ', signal:', sig)
+  private onDisconnect = () => this._logger.debug('[onDisconnect] disconnected')
+  private onError = (err: Error) => this._logger.debug('[onError] Failed to start subprocess. err:', err?.message)
+  private onExit = (code?: number) => this._logger.debug('[onExit] code:', code)
+  private onMessage = (data: Buffer) => this._logger.debug('[onMessage] message', data?.toString())
 
   private getWolfRunner(pythonPath: string, rootDir: string) {
     const wolfPath: string = path.join(rootDir, "scripts/server.py");

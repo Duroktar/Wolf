@@ -17,14 +17,14 @@ export class WolfClient {
     return new Promise<void>((resolve, reject) => {
       this._logger.debug('Connecting')
 
-      this.socket = new Websocket(this.connectionString());
+      this._socket = new Websocket(this.connectionString());
 
-      this.socket?.on('error', err => {
+      this._socket?.on('error', err => {
         // The client always tries connecting too soon so retry a few times.
         const connectionError = err.message.includes('ECONNREFUSED');
         if (connectionError && retry > 0)   {
           this._logger.debug(`... Retrying in ${wait}ms`)
-          setTimeout(() => {
+          this._reconnectTimer = setTimeout(() => {
             resolve(this.connect(retry - 1, clampBelow(1500, wait * 2)))
           }, wait)
         }
@@ -36,29 +36,31 @@ export class WolfClient {
         }
       })
 
-      this.socket?.once('open', () => {
+      this._socket?.once('open', () => {
         this._logger.info('Connected')
-        this.socket?.on('close', () => {
+        this._socket?.on('close', () => {
           this.emit('close')
           this._logger.debug('Closed')
         })
-        this.socket?.on('message', this.handleMessage)
+        this._socket?.on('message', this.handleMessage)
         resolve(this.emit('ready', this.identifier))
       })
     })
   }
 
   public close = (): void => {
+    if (this._reconnectTimer)
+      clearTimeout(this._reconnectTimer)
     this._emitter.removeAllListeners()
-    this.socket?.close()
+    this._socket?.close()
   }
 
   public traceScript = (filepath: string): void => {
-    this.socket?.send(JSON.stringify({ filepath  }))
+    this._socket?.send(JSON.stringify({ filepath  }))
   }
 
   public traceRawSrc(src: string): void {
-    this.socket?.send(JSON.stringify({ data: src, raw: true }))
+    this._socket?.send(JSON.stringify({ data: src, raw: true }))
   }
 
   public on = <E extends keyof WolfClientEventCallbackMap>(
@@ -102,6 +104,7 @@ export class WolfClient {
     return `ws://${this.host}:${this.port}/${this.identifier}`;
   }
 
-  public socket: Websocket | undefined
+  private _socket: Websocket | undefined
   private _emitter = new EventEmitter()
+  private _reconnectTimer: NodeJS.Timeout | undefined
 }

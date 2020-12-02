@@ -14,7 +14,7 @@ export enum LogLevel {
 export class ConsoleLogger implements ILogger {
   constructor(
     private id: string,
-    private level = LogLevel.ERROR,
+    private level = LogLevel.DEBUG,
   ) {}
 
   public info(...args: any[]): void {
