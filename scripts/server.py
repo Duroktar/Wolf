@@ -23,13 +23,22 @@ limitations under the License.
 """
 import json
 import os
+import sys
 import asyncio
 import websockets
 import concurrent.futures
 from datetime import datetime
 
-from asyncio_run import run
 from wolf import Wolf
+
+
+PY36 = sys.version_info[0:2] == (3, 6)
+
+if PY36:
+    print('In Python 3.6 .. Polyfilling asyncio.run')
+    from asyncio_run import run
+else:
+    run = asyncio.run
 
 
 wolf_host = os.environ.get('WOLF_SERVER_INTERFACE', 'localhost')
