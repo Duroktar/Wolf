@@ -117,7 +117,10 @@ export type WolfClientEvent = keyof WolfClientEventCallbackMap
 export type ActiveTextEditorChangeEventResult = TextEditor | undefined;
 
 export type WolfEvent =
+  | 'connection-closed'
+  | 'connection-error'
   | 'decorations-changed'
+  | 'decorations-error'
   | 'decorations-updated';
 
 

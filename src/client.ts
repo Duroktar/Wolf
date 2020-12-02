@@ -22,7 +22,7 @@ export class WolfClient {
       this._socket?.on('error', err => {
         // The client always tries connecting too soon so retry a few times.
         const connectionError = err.message.includes('ECONNREFUSED');
-        if (connectionError && retry > 0)   {
+        if (connectionError && retry > 0) {
           this._logger.debug(`... Retrying in ${wait}ms`)
           this._reconnectTimer = setTimeout(() => {
             resolve(this.connect(retry - 1, clampBelow(1500, wait * 2)))
@@ -38,11 +38,14 @@ export class WolfClient {
 
       this._socket?.once('open', () => {
         this._logger.info('Connected')
-        this._socket?.on('close', () => {
-          this.emit('close')
-          this._logger.debug('Closed')
-        })
+
         this._socket?.on('message', this.handleMessage)
+
+        this._socket?.on('close', () => {
+          this._logger.debug('Closed')
+          this.emit('close')
+        })
+
         resolve(this.emit('ready', this.identifier))
       })
     })
@@ -56,7 +59,7 @@ export class WolfClient {
   }
 
   public traceScript = (filepath: string): void => {
-    this._socket?.send(JSON.stringify({ filepath  }))
+    this._socket?.send(JSON.stringify({ filepath }))
   }
 
   public traceRawSrc(src: string): void {

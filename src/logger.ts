@@ -14,7 +14,7 @@ export enum LogLevel {
 export class ConsoleLogger implements ILogger {
   constructor(
     private id: string,
-    private level = LogLevel.DEBUG,
+    private level = LogLevel.ERROR,
   ) {}
 
   public info(...args: any[]): void {
@@ -40,5 +40,5 @@ export class ConsoleLogger implements ILogger {
 
   private shouldPrint = (lvl: LogLevel) => this.level <= lvl
   private formatLogString = () =>
-    `[${new Date().toISOString()}][${this.id}]:`
+    `[${this.level.toUpperCase()}][${new Date().toISOString()}][${this.id}]:`
 }

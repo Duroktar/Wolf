@@ -26,18 +26,24 @@ suite("Extension Tests", () => {
     api?.stopServer();
   })
 
-	test("Should generate decorations", async () => {
+  test("Should generate decorations", async () => {
     assert.notStrictEqual(api, undefined, 'WolfAPI not found')
-    return new Promise(resolve => {
+    return new Promise((resolve, reject) => {
       api.on('decorations-changed', () => {
         assert.strictEqual(api.activeEditorHasDecorations, true, 'No decorations')
         resolve()
       })
 
+      api.on('decorations-error', () => {
+        assert.strictEqual(api.activeEditorHasDecorations, true, 'No decorations')
+        resolve()
+      })
+
       openAndShowTextDocument(join(__dirname, '..', 'test.py'))
-        .then(() => api.stepInWolf())
+        .then(() => vscode.commands.executeCommand('wolf.barkAtCurrentFile'))
+        .catch(reject)
     })
   })
-  // This test can sometimes take a while (or fail randomly) on CI servers.
-  .timeout(60000).retries(3);
+    // This test can sometimes take a while (or fail randomly) on CI servers.
+    .timeout(30000).retries(3);
 });

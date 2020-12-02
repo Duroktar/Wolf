@@ -175,7 +175,7 @@
     "copy-files": "copyfiles -E -u 1 \"scripts/test.py\" \"out/test/\"",
     "lint": "eslint src --ext ts",
     "pretest": "yarn webpack && yarn run test-compile && yarn run copy-files",
-    "test": "node ./out/test/runTest.js",
+    "test": "cross-env CI=true node out/test/runTest.js",
     "watch": "tsc -watch -p ./",
     "ext:package": "vsce package",
     "ext:publish": "vsce publish"
@@ -194,6 +194,7 @@
     "@typescript-eslint/parser": "^4.8.1",
     "copy-webpack-plugin": "^6.3.2",
     "copyfiles": "^2.4.0",
+    "cross-env": "^7.0.3",
     "eslint": "^7.13.0",
     "glob": "^7.1.6",
     "mocha": "^8.1.3",

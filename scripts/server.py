@@ -28,10 +28,11 @@ import websockets
 import concurrent.futures
 from datetime import datetime
 
+from asyncio_run import run
 from wolf import Wolf
 
 
-wolf_host = os.environ.get('WOLF_SERVER_INTERFACE', '0.0.0.0')
+wolf_host = os.environ.get('WOLF_SERVER_INTERFACE', 'localhost')
 wolf_port = os.environ.get('WOLF_SERVER_PORT', '9879')
 
 
@@ -40,7 +41,7 @@ loop = asyncio.get_event_loop()
 
 
 def server_log(path: str, message):
-    print("[" + datetime.now().isoformat() + "] path=" + path + " -- " + message)
+    print(f"[{datetime.now().isoformat()}] path={path} -- {message}")
 
 def res_200(response: str, path: str):
     return json.dumps({ "statusCode" : 200, "path": path, "output": response })
@@ -58,9 +59,9 @@ def res_500(path: str):
 def process_python_script(websocket, filepath: str):
     wolf = Wolf()
     def handle_emit(line: str):
-        async def doit():
+        async def send_websocket_response():
             await websocket.send(res_200(json.dumps(line), filepath))
-        asyncio.run(doit())
+        run(send_websocket_response())
     wolf.add_listener(handle_emit)
     return wolf.main(filepath), False
 
@@ -68,9 +69,9 @@ def process_python_script(websocket, filepath: str):
 def process_raw_source(websocket, source: str, path: str):
     wolf = Wolf()
     def handle_emit(line: str):
-        async def doit():
+        async def send_websocket_response():
             await websocket.send(res_200(json.dumps(line), path))
-        asyncio.run(doit())
+        run(send_websocket_response())
     wolf.add_listener(handle_emit)
     return wolf.run_for_source(source), False
 
@@ -100,23 +101,25 @@ async def handler(websocket: websockets.WebSocketClientProtocol, path: str):
                 await websocket.send(res_200_eof(response, path))
 
             else:
+                server_log(path, "Bad Request")
                 await websocket.send(res_400(path))
 
             if stop:
+                server_log(path, "Stopping")
                 break
 
     except websockets.exceptions.ConnectionClosed:
         server_log(path, "Client Disconnected")
     except websockets.exceptions.WebSocketException as e:
-        server_log(path, "SOCKET ERROR: " + str(e))
+        server_log(path, f"SOCKET ERROR: {e}")
     except Exception as e:
-        server_log(path, "SERVER ERROR: " + str(e))
+        server_log(path, f"SERVER ERROR: {e}")
         await websocket.send(res_500(path))
 
 
 if __name__ == "__main__":
-    print("[" + datetime.now().isoformat() + "] Wolf Tracing Server Started @ http://" + wolf_host + ":" + wolf_port + "/")
-    start_server = websockets.serve(handler, wolf_host, int(wolf_port))
+    print(f'[{datetime.now().isoformat()}] Wolf Tracing Server Started @ http://{wolf_host}:{wolf_port}/')
+    start_server = websockets.serve(handler, wolf_host, wolf_port)
 
     loop.run_until_complete(start_server)
     loop.run_forever()

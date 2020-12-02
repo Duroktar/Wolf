@@ -143,22 +143,27 @@ export class WolfAPI {
         wolfClient.on('error', (err: Error) => {
           tempfile.removeCallback()
 
-          if (this.isWolfSession(document)) { // TODO: Move handlers into a proper Disposable class
-            this._logger.debug('Error')
-            this._logger.error(err)
+          this._logger.debug('Error')
+          this._logger.error(err)
 
-            if (this.shouldOutputErrors)
-              this.logToOutput("(Wolf Error):", err.message ?? '<no message>');
-          }
+          if (this.shouldOutputErrors)
+            this.logToOutput("(Wolf Error):", err.message ?? '<no message>');
+
+          this.emit('decorations-error', document.fileName);
         })
 
         wolfClient.on('close', () => {
           this._logger.debug('Closing')
 
           tempfile.removeCallback()
+          this.emit('connection-closed', document.fileName);
         })
       })
-      .catch(() => tempfile.removeCallback())
+      .catch(() => {
+        this._logger.debug('Connection Error')
+        tempfile.removeCallback()
+        this.emit('connection-error', document.fileName);
+      })
   };
 
   public reRenderDecorations = (): void => {
@@ -279,11 +284,10 @@ export class WolfAPI {
     data: T.WolfTraceLineResult[] = [],
   ): string[] => {
     return data.map(
-      l =>
-        `LINENO: ${l.lineno} - VALUE: ${l.value}${
-        l.error ? `, ERROR: ${l.error}` : ""
-        }`
-    );
+      l => {
+        const msgText = `LINENO: ${l.lineno} - VALUE: ${l.value}`;
+        return msgText + l.error ? `, ERROR: ${l.error}` : "";
+    });
   }
 
   private stopClient(document: vscode.TextDocument): void {
