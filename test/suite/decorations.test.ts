@@ -34,7 +34,7 @@ suite("Extension Tests", () => {
         resolve()
       })
 
-      openAndShowTextDocument(join(__dirname, '..', '..', 'test', 'test.py'))
+      openAndShowTextDocument(join(__dirname, '..', 'test.py'))
         .then(() => api.stepInWolf())
     })
   })

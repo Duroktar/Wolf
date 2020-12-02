@@ -4,7 +4,7 @@
 .vscode-test/**
 images/**
 node_modules/**
-out/**
+out/src/**
 python_modules/**
 src/**
 test/**
