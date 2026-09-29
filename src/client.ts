@@ -99,8 +99,9 @@ export class WolfClient {
     }
     catch (err) {
       this._logger.warn(`Error parsing data: ${data.toString()}`)
-      this.emit('error', err)
+      this.emit('error', err instanceof Error ? err : new Error(String(err)))
     }
+
   }
 
   private connectionString(): string | import("url").URL {

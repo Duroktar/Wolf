@@ -13,6 +13,12 @@ features = [x[0:-1] for x in inputs]  # ?
 labels = [x[-1] for x in inputs]  # ?
 """
 
+import sys
+
 def test_comprehensions(snapshot):
     res = wolftest(snippet)
-    snapshot.assert_match(res)
+    if sys.version_info >= (3, 12):
+        snapshot.assert_match(res, 'test_comprehensions_py312')
+    else:
+        snapshot.assert_match(res)
+

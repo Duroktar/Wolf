@@ -7,8 +7,8 @@ import { spawn } from "child_process";
 import { WolfSessionController } from "./sessions";
 import { WolfDecorationsController } from "./decorations";
 import { WolfOutputController } from "./output";
-import { WolfError } from "./errors";
 import { consoleLoggerFactory, wolfClientFactory } from "./factories";
+
 import { fileIdentifier, getActiveEditor, makeTempFile } from "./helpers";
 import { parseAndValidateResponse, parseAndValidateEofResponse } from "./helpers";
 import { nameOf, not } from "./utils";
@@ -256,28 +256,63 @@ export class WolfAPI {
   }
 
   public get rootExtensionDir(): string {
-    const res = vscode.extensions.getExtension("traBpUkciP.wolf");
-    if (res?.extensionPath === undefined)
-      throw new WolfError('no WolfAPI.rootExtensionDir)');
-    return res.extensionPath;
+    return this.context.extensionPath;
   }
 
   public get pythonPath(): string {
-    const fromconfig = this.config.get<string>("pythonPath")
-    /* Github-Actions Windows CI tests don't like 'python3' */
-    return fromconfig || this.__platform === "win32" ? 'python' : 'python3';
+    const fromConfig = this.config.get<string>("pythonPath");
+    if (fromConfig) {
+      return fromConfig;
+    }
+    try {
+      const pythonExt = vscode.extensions.getExtension("ms-python.python");
+      if (pythonExt?.isActive && pythonExt.exports) {
+        const envPath = pythonExt.exports.environments?.getActiveEnvironmentPath?.()?.path
+          ?? pythonExt.exports.environment?.getActiveEnvironmentPath?.()?.path;
+        if (envPath) {
+          return envPath;
+        }
+      }
+    } catch {
+      // Ignore extension lookup errors and fallback
+    }
+    return this.__platform === "win32" ? "python" : "python3";
   }
 
   public getPythonVersion(): Promise<string> {
-    const child = spawn(this.pythonPath, ['--version']);
     return new Promise((resolve, reject) => {
-      child.stderr.on('data', err => {
+      const child = spawn(this.pythonPath, ["--version"]);
+      let output = "";
+      child.stdout.on("data", (data: Buffer) => {
+        output += data.toString();
+      });
+      child.stderr.on("data", (data: Buffer) => {
+        output += data.toString();
+      });
+      child.on("error", (err: Error) => {
         reject(err);
-      })
-      child.stdout.on('data', (data: Buffer) => {
-        resolve(data.toString().split(' ')[1]);
-      })
-    })
+      });
+      child.on("close", (code: number) => {
+        const match = output.match(/Python\s+([0-9.]+)/i);
+        if (match) {
+          resolve(match[1]);
+        } else if (output.trim()) {
+          resolve(output.trim().split(" ")[1] || output.trim());
+        } else {
+          reject(new Error(`Failed to determine Python version (exit code ${code})`));
+        }
+      });
+    });
+  }
+
+  public dispose(): void {
+    this.stopServer();
+    this.clearAll();
+    for (const client of this._clients) {
+      client.close();
+    }
+    this._clients = [];
+    this._eventEmitter.removeAllListeners();
   }
 
   private prettyPrintWolfTraceData = (
@@ -286,9 +321,10 @@ export class WolfAPI {
     return data.map(
       l => {
         const msgText = `LINENO: ${l.lineno} - VALUE: ${l.value}`;
-        return msgText + l.error ? `, ERROR: ${l.error}` : "";
+        return l.error ? `${msgText}, ERROR: ${l.error}` : msgText;
     });
   }
+
 
   private stopClient(document: vscode.TextDocument): void {
     const wolfClient = this._clients

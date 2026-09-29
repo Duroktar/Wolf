@@ -33,14 +33,14 @@ export function wolfDecorationStoreFactory(
 
 export function wolfClientFactory(
   identifier: string = randomString(),
-  host = '0.0.0.0',
+  host = '127.0.0.1',
   port = '9879',
 ): WolfClient {
   return new WolfClient(host, port, identifier);
 }
 
 export function wolfServerDaemonFactory(
-  host = '0.0.0.0',
+  host = '127.0.0.1',
   port = '9879',
 ): WolfServerDaemon {
   return new WolfServerDaemon(
@@ -48,6 +48,7 @@ export function wolfServerDaemonFactory(
     port,
   );
 }
+
 
 export function wolfOutputFactory(channel: vscode.OutputChannel): WolfOutputController {
   return new WolfOutputController(channel);

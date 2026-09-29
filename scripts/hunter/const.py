@@ -1,6 +1,11 @@
 import site
 import sys
-from distutils.sysconfig import get_python_lib
+try:
+    from distutils.sysconfig import get_python_lib
+except ImportError:
+    import sysconfig
+    get_python_lib = lambda: sysconfig.get_path('purelib')
+
 
 SITE_PACKAGES_PATHS = set()
 if hasattr(site, 'getsitepackages'):

@@ -3,12 +3,12 @@ import { ILogger } from "./types"
 
 
 export enum LogLevel {
-  OFF = 'OFF',
-  INFO = 'INFO',
-  WARN = 'WARN',
-  ERROR = 'ERROR',
-  ALL = 'ALL',
-  DEBUG = 'DEBUG',
+  OFF = 0,
+  ERROR = 1,
+  WARN = 2,
+  INFO = 3,
+  DEBUG = 4,
+  ALL = 5,
 }
 
 export class ConsoleLogger implements ILogger {
@@ -38,7 +38,8 @@ export class ConsoleLogger implements ILogger {
       console.debug(this.formatLogString(), ...args)
   }
 
-  private shouldPrint = (lvl: LogLevel) => this.level <= lvl
+  private shouldPrint = (lvl: LogLevel) => this.level >= lvl
   private formatLogString = () =>
-    `[${this.level.toUpperCase()}][${new Date().toISOString()}][${this.id}]:`
+    `[${LogLevel[this.level]}][${new Date().toISOString()}][${this.id}]:`
+
 }

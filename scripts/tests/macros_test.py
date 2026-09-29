@@ -13,6 +13,12 @@ labels = [x[-1] for x in inputs]  # ?
 hat = labels  # ?
 """
 
+import sys
+
 def test_macros(snapshot):
     res = wolftest(snippet)
-    snapshot.assert_match(res)
+    if sys.version_info >= (3, 12):
+        snapshot.assert_match(res, 'test_macros_py312')
+    else:
+        snapshot.assert_match(res)
+

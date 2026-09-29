@@ -5,15 +5,21 @@ import { registerCommand } from "./helpers";
 import { clamp, not } from "./utils";
 import { wolfStandardApiFactory } from "./factories";
 
+let activeWolfAPI: WolfAPI | null = null;
+
 export function activate(context: vscode.ExtensionContext): WolfAPI {
   const output = vscode.window.createOutputChannel("Wolf");
   const wolfAPI = wolfStandardApiFactory(context, { output });
+  activeWolfAPI = wolfAPI;
   let updateTimeout: null | NodeJS.Timeout = null;
 
   if (not(Boolean(process.env.WOLF_TEST_SESSION ?? process.env.CI)))
     wolfAPI.startServer();
 
   context.subscriptions.push(
+    output,
+    { dispose: () => wolfAPI.dispose() },
+
     registerCommand("wolf.barkAtCurrentFileLive", startWolfLiveMode),
     registerCommand("wolf.barkAtCurrentFile", startWolfNormal),
     registerCommand("wolf.touchBarStart", startWolfNormal),
@@ -127,3 +133,11 @@ export function activate(context: vscode.ExtensionContext): WolfAPI {
       clearTimeout(updateTimeout);
   }
 }
+
+export function deactivate(): void {
+  if (activeWolfAPI) {
+    activeWolfAPI.dispose();
+    activeWolfAPI = null;
+  }
+}
+

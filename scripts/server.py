@@ -32,81 +32,96 @@ from datetime import datetime
 from wolf import Wolf
 
 
-PY36 = sys.version_info[0:2] == (3, 6)
-
-if PY36:
-    print('In Python 3.6 .. Polyfilling asyncio.run')
-    from asyncio_run import run
+if len(sys.argv) > 1:
+    wolf_host = sys.argv[1]
 else:
-    run = asyncio.run
+    wolf_host = os.environ.get('WOLF_SERVER_INTERFACE', 'localhost')
 
-
-wolf_host = os.environ.get('WOLF_SERVER_INTERFACE', 'localhost')
-wolf_port = os.environ.get('WOLF_SERVER_PORT', '9879')
+if len(sys.argv) > 2:
+    wolf_port = int(sys.argv[2])
+else:
+    wolf_port = int(os.environ.get('WOLF_SERVER_PORT', '9879'))
 
 
 pool = concurrent.futures.ThreadPoolExecutor((os.cpu_count() or 1))
-loop = asyncio.get_event_loop()
+current_loop = None
 
 
 def server_log(path: str, message):
     print(f"[{datetime.now().isoformat()}] path={path} -- {message}")
 
+
 def res_200(response: str, path: str):
-    return json.dumps({ "statusCode" : 200, "path": path, "output": response })
+    return json.dumps({"statusCode": 200, "path": path, "output": response})
+
 
 def res_200_eof(response: str, path: str):
-    return json.dumps({ "statusCode" : 200, "path": path, "total_output": response, "eof" : 1 })
+    return json.dumps({"statusCode": 200, "path": path, "total_output": response, "eof": 1})
+
 
 def res_400(path: str):
-    return json.dumps({ "statusCode" : 400, "message": "Bad Request", "path": path })
+    return json.dumps({"statusCode": 400, "message": "Bad Request", "path": path})
+
 
 def res_500(path: str):
-    return json.dumps({ "statusCode" : 500, "message": "Internal Server Error", "path": path })
+    return json.dumps({"statusCode": 500, "message": "Internal Server Error", "path": path})
 
 
-def process_python_script(websocket, filepath: str):
+def process_python_script(loop, websocket, filepath: str):
     wolf = Wolf()
-    def handle_emit(line: str):
-        async def send_websocket_response():
-            await websocket.send(res_200(json.dumps(line), filepath))
-        run(send_websocket_response())
+
+    def handle_emit(line):
+        try:
+            future = asyncio.run_coroutine_threadsafe(
+                websocket.send(res_200(json.dumps(line), filepath)),
+                loop
+            )
+            future.result(timeout=5)
+        except Exception as e:
+            server_log(filepath, f"Error emitting line: {e}")
+
     wolf.add_listener(handle_emit)
-    return wolf.main(filepath), False
+    return wolf.run(filepath, test=True), False
 
 
-def process_raw_source(websocket, source: str, path: str):
+def process_raw_source(loop, websocket, source: str, path: str):
     wolf = Wolf()
-    def handle_emit(line: str):
-        async def send_websocket_response():
-            await websocket.send(res_200(json.dumps(line), path))
-        run(send_websocket_response())
+
+    def handle_emit(line):
+        try:
+            future = asyncio.run_coroutine_threadsafe(
+                websocket.send(res_200(json.dumps(line), path)),
+                loop
+            )
+            future.result(timeout=5)
+        except Exception as e:
+            server_log(path, f"Error emitting line: {e}")
+
     wolf.add_listener(handle_emit)
     return wolf.run_for_source(source), False
 
 
-async def handler(websocket: websockets.WebSocketClientProtocol, path: str):
+async def handler(websocket, path: str = ""):
     server_log(path, "Client Connected")
     try:
-
         while True:
-
             message = await websocket.recv()
-
             data = json.loads(message)
 
-            if data['raw'] == True:
+            if data.get('raw'):
                 source = data['data']
                 server_log(path, "Tracing Script")
-                args = (pool, process_raw_source, websocket, source, path)
-                response, stop = await loop.run_in_executor(*args)
+                response, stop = await current_loop.run_in_executor(
+                    pool, process_raw_source, current_loop, websocket, source, path
+                )
                 await websocket.send(res_200_eof(response, path))
 
-            elif data['filepath']:
+            elif data.get('filepath'):
                 filepath = data['filepath']
                 server_log(path, "Tracing File: " + filepath)
-                args = (pool, process_python_script, websocket, filepath)
-                response, stop = await loop.run_in_executor(*args)
+                response, stop = await current_loop.run_in_executor(
+                    pool, process_python_script, current_loop, websocket, filepath
+                )
                 await websocket.send(res_200_eof(response, path))
 
             else:
@@ -123,12 +138,44 @@ async def handler(websocket: websockets.WebSocketClientProtocol, path: str):
         server_log(path, f"SOCKET ERROR: {e}")
     except Exception as e:
         server_log(path, f"SERVER ERROR: {e}")
-        await websocket.send(res_500(path))
+        try:
+            await websocket.send(res_500(path))
+        except Exception:
+            pass
+
+
+async def handler_adapter(*args):
+    if len(args) == 2:
+        websocket, path = args
+    else:
+        websocket = args[0]
+        path = getattr(websocket, 'path', '')
+        if not path and hasattr(websocket, 'request'):
+            path = getattr(websocket.request, 'path', '')
+    await handler(websocket, path)
+
+
+async def main():
+    global current_loop
+    current_loop = asyncio.get_running_loop() if hasattr(asyncio, 'get_running_loop') else asyncio.get_event_loop()
+
+    server = await websockets.serve(handler_adapter, wolf_host, wolf_port)
+    server_log("/", f"Wolf Tracing Server Started @ http://{wolf_host}:{wolf_port}/")
+    try:
+        await asyncio.Future()
+    except asyncio.CancelledError:
+        server.close()
+        await server.wait_closed()
 
 
 if __name__ == "__main__":
-    print(f'[{datetime.now().isoformat()}] Wolf Tracing Server Started @ http://{wolf_host}:{wolf_port}/')
-    start_server = websockets.serve(handler, wolf_host, wolf_port)
+    try:
+        if sys.version_info >= (3, 7):
+            asyncio.run(main())
+        else:
+            loop = asyncio.get_event_loop()
+            current_loop = loop
+            loop.run_until_complete(main())
+    except (KeyboardInterrupt, SystemExit):
+        pass
 
-    loop.run_until_complete(start_server)
-    loop.run_forever()

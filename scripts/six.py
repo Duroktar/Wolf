@@ -186,6 +186,19 @@ class _SixMetaPathImporter(object):
             return self
         return None
 
+    def find_spec(self, fullname, path, target=None):
+        if fullname in self.known_modules:
+            from importlib.util import spec_from_loader
+            return spec_from_loader(fullname, self)
+        return None
+
+    def create_module(self, spec):
+        return self.load_module(spec.name)
+
+    def exec_module(self, module):
+        pass
+
+
     def __get_module(self, fullname):
         try:
             return self.known_modules[fullname]

@@ -34,7 +34,11 @@ from pprint import pformat
 from importlib import util
 from contextlib import contextmanager
 
-from astunparse import unparse
+try:
+    from ast import unparse
+except ImportError:
+    from astunparse import unparse
+
 from hunter import trace
 
 
