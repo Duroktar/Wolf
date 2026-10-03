@@ -1,4 +1,5 @@
 import * as path from 'path';
+import { randomBytes } from 'crypto';
 import { ChildProcess, spawn } from 'child_process';
 import { consoleLoggerFactory } from './factories';
 import { nameOf } from './utils';
@@ -6,10 +7,15 @@ import { nameOf } from './utils';
 
 export class WolfServerDaemon {
   private _logger = consoleLoggerFactory(nameOf(WolfServerDaemon))
+  private _authToken = randomBytes(32).toString('hex')
   public constructor(
     private host: string,
     private port: string,
   ) { }
+
+  public get authToken(): string {
+    return this._authToken;
+  }
 
   public start = (pythonPath: string, rootDir: string): this => {
     this._logger.log('Starting')
@@ -71,7 +77,7 @@ export class WolfServerDaemon {
       options.env.PYTHONIOENCODING = 'utf8'
     }
 
-    return spawn(pythonPath, [wolfPath, this.host, this.port], options);
+    return spawn(pythonPath, [wolfPath, this.host, this.port, this._authToken], options);
   }
 
   private _service: ChildProcess | null = null

@@ -177,7 +177,7 @@ def main() -> None:
     loop = asyncio.new_event_loop()
 
     # Create a queue of user inputs. There's no need to limit its size.
-    inputs: asyncio.Queue[str] = asyncio.Queue(loop=loop)
+    inputs: asyncio.Queue[str] = asyncio.Queue()
 
     # Create a stop condition when receiving SIGINT or SIGTERM.
     stop: asyncio.Future[None] = loop.create_future()

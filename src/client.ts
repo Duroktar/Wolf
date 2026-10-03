@@ -11,37 +11,55 @@ export class WolfClient {
     private host: string,
     private port: string,
     public identifier: string,
-  ) {}
+    private authToken?: string,
+  ) { }
 
   public connect(retry = 10, wait = 100): Promise<void> {
     return new Promise<void>((resolve, reject) => {
+      this._closed = false;
+      this._connectReject = reject;
       this._logger.debug('Connecting')
 
-      this._socket = new Websocket(this.connectionString());
+      this._socket = new Websocket(this.connectionString(), this.authToken ? {
+        headers: { Authorization: `Bearer ${this.authToken}` },
+      } : undefined);
+      const socket = this._socket;
+      let opened = false;
 
-      this._socket?.on('error', err => {
+      socket.once('error', err => {
         // The client always tries connecting too soon so retry a few times.
         const connectionError = err.message.includes('ECONNREFUSED');
-        if (connectionError && retry > 0) {
+        if (connectionError && retry > 0 && !this._closed) {
           this._logger.debug(`... Retrying in ${wait}ms`)
           this._reconnectTimer = setTimeout(() => {
-            resolve(this.connect(retry - 1, clampBelow(1500, wait * 2)))
+            this._reconnectTimer = undefined;
+            this.connect(retry - 1, clampBelow(1500, wait * 2)).then(resolve, reject)
           }, wait)
         }
-        else if (connectionError && retry === 0) {
-          reject(this._logger.error('Retries exceeded. Aborting..'))
-        }
-        else {
-          reject(err)
+        else if (!this._closed) {
+          reject(connectionError
+            ? this._logger.error('Retries exceeded. Aborting..')
+            : err)
         }
       })
 
-      this._socket?.once('open', () => {
+      socket.once('close', () => {
+        if (!opened && !this._closed && this._socket === socket && !this._reconnectTimer)
+          reject(new Error('Wolf server closed before the connection opened'));
+      });
+
+      socket.once('open', () => {
+        if (this._closed) {
+          socket.close();
+          return;
+        }
+        opened = true;
         this._logger.info('Connected')
+        this._connectReject = undefined;
 
-        this._socket?.on('message', this.handleMessage)
+        socket.on('message', this.handleMessage)
 
-        this._socket?.on('close', () => {
+        socket.on('close', () => {
           this._logger.debug('Closed')
           this.emit('close')
         })
@@ -52,10 +70,16 @@ export class WolfClient {
   }
 
   public close = (): void => {
+    this._closed = true;
     if (this._reconnectTimer)
       clearTimeout(this._reconnectTimer)
+    this._reconnectTimer = undefined;
+    this._connectReject?.(new Error('Wolf client closed before connecting'));
+    this._connectReject = undefined;
     this._emitter.removeAllListeners()
-    this._socket?.close()
+    if (this._socket && this._socket.readyState < Websocket.CLOSING)
+      this._socket.terminate()
+    this._socket = undefined;
   }
 
   public traceScript = (filepath: string): void => {
@@ -105,10 +129,14 @@ export class WolfClient {
   }
 
   private connectionString(): string | import("url").URL {
-    return `ws://${this.host}:${this.port}/${this.identifier}`;
+    const url = new URL(`ws://${this.host}:${this.port}`);
+    url.pathname = `/${this.identifier}`;
+    return url;
   }
 
   private _socket: Websocket | undefined
   private _emitter = new EventEmitter()
   private _reconnectTimer: NodeJS.Timeout | undefined
+  private _connectReject: ((reason?: Error) => void) | undefined
+  private _closed = false
 }

@@ -6,4 +6,3 @@ pytest-watch>=4.2.0
 rope>=1.0.0
 snapshottest>=0.6.0
 websockets>=12.0.0; python_version>='3.8'
-websockets>=8.1.0; python_version<'3.8'

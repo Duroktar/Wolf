@@ -85,7 +85,16 @@ Wolf is Good for:
 ## Requirements
 
 * Visual Studio Code
-* Python 3.6 and up (tested on 3.6 through 3.12+)
+* Python 3.8 or later
+
+## Security
+
+Wolf executes the active Python file with your user permissions; it is an
+exploration tool, not a sandbox. The tracing server binds to localhost by
+default, requires a per-extension authentication token, and rejects browser
+origins. Do not run Wolf on untrusted code. Overriding
+`WOLF_SERVER_INTERFACE` can expose the server to other machines and should be
+done only with an appropriate network security boundary.
 
 
 ## Extension Settings

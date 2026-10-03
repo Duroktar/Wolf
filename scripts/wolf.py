@@ -28,6 +28,8 @@ import re
 import json
 import traceback
 import io
+import threading
+import operator as py_operator
 from collections import OrderedDict
 from copy import deepcopy
 from pprint import pformat
@@ -45,6 +47,8 @@ from hunter import trace
 ###################
 #
 # Utilities, helper functions, regex ..
+
+_SCRIPT_PATH_LOCK = threading.RLock()
 
 # This is to help us find lines tagged with a Wolf
 # macro. If the line has a print statement, then we
@@ -79,12 +83,18 @@ def script_path(script_dir):
         and restoring it afterwards. This trick allows
         relative imports to work on the target script.
     """
-    original_cwd = os.getcwd()
-    os.chdir(script_dir)
-    sys.path.insert(1, script_dir)
-    yield
-    os.chdir(original_cwd)
-    sys.path.remove(script_dir)
+    with _SCRIPT_PATH_LOCK:
+        original_cwd = os.getcwd()
+        sys.path.insert(1, script_dir)
+        try:
+            os.chdir(script_dir)
+            yield
+        finally:
+            os.chdir(original_cwd)
+            try:
+                sys.path.remove(script_dir)
+            except ValueError:
+                pass
 
 
 def try_deepcopy(obj):
@@ -217,32 +227,46 @@ class Wolf:
                 m_locals_copy = {k: try_deepcopy(v) for k, v in _locals.items()}
                 m_globals_copy = {k: try_deepcopy(v) for k, v in _globals.items()}
 
-                if isinstance(tree.body[0], ast.Assign):
+                if isinstance(tree.body[0], (ast.Assign, ast.AugAssign)):
                     node = tree.body[0]
 
-                    if hasattr(node, 'target'):
+                    if isinstance(node, ast.AugAssign):
                         target = node.target
                     else:
                         target = node.targets[0]
 
-                    # Get the variable name
-                    local_name = target.id
+                    if isinstance(target, ast.Name):
+                        local_name = target.id
 
-                    if isinstance(tree.body[0], ast.AugAssign):
-                        operator = {'Mult': '*=', 'Add': '+=', 'Sub': '-=', 'Div': '/='}[node.op]
+                        if isinstance(node, ast.AugAssign):
+                            operation = {
+                                ast.Add: py_operator.add,
+                                ast.Sub: py_operator.sub,
+                                ast.Mult: py_operator.mul,
+                                ast.Div: py_operator.truediv,
+                                ast.FloorDiv: py_operator.floordiv,
+                                ast.Mod: py_operator.mod,
+                                ast.Pow: py_operator.pow,
+                                ast.BitAnd: py_operator.and_,
+                                ast.BitOr: py_operator.or_,
+                                ast.BitXor: py_operator.xor,
+                                ast.LShift: py_operator.lshift,
+                                ast.RShift: py_operator.rshift,
+                            }.get(type(node.op))
+                            if operation is None:
+                                value = self.parse_eval(match.group('macro').strip(), m_globals_copy, m_locals_copy, event=event)
+                            else:
+                                left = self.parse_eval(local_name, m_globals_copy, m_locals_copy, event=event)
+                                right = self.parse_eval(unparse(node.value), m_globals_copy, m_locals_copy, event=event)
+                                value = operation(left, right)
+                        else:
+                            right_side_value = source[source.index('=')+1:].strip()
+                            value = self.parse_eval(right_side_value, m_globals_copy, m_locals_copy, event=event)
 
-                        # This get the value of the local variable from earlier
-                        left_side_value = self.parse_eval(local_name, m_globals_copy, m_locals_copy, event=event)
-
-                        # This evaluates the statement with the infixed operator
-                        value = self.parse_eval("{} {} {}".format(left_side_value, operator, value), event=event)
+                        # Show the value after the assignment without repeating its side effects.
+                        value = "{} = {}".format(local_name, value)
                     else:
-                        right_side_value = source[source.index('=')+1:].strip()
-                        # Basic macro to evaluate
-                        value = self.parse_eval(right_side_value, m_globals_copy, m_locals_copy, event=event)
-
-                    # Make sure to display the output as a variable assignment
-                    value = "{} = {}".format(local_name, value)
+                        value = self.parse_eval(match.group('macro').strip(), m_globals_copy, m_locals_copy, event=event)
 
                 else:
                     # Basic macro evaluation
@@ -361,17 +385,19 @@ class Wolf:
             Used internally for running unit tests.
         """
         from tempfile import mkstemp
-
-        testdir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tests')
-        tmpfile_path = mkstemp(suffix=".py", text=True)[1]
+        descriptor, tmpfile_path = mkstemp(suffix=".py", text=True)
+        os.close(descriptor)
         full_path = os.path.abspath(tmpfile_path)
-        tmpfile_name = os.path.basename(tmpfile_path).split('.')[0]
-        filename = os.path.basename(tmpfile_path)
-
-        with open(full_path, 'a', encoding="utf-8") as the_file:
-            the_file.write(snippet.strip() + '\n')
-
-        return self.run(full_path, test=True) 
+        try:
+            with open(full_path, 'w', encoding="utf-8") as the_file:
+                the_file.write(snippet.strip() + '\n')
+            return self.run(full_path, test=True)
+        except BaseException:
+            try:
+                os.remove(full_path)
+            except OSError:
+                pass
+            raise
 
 
     def run_for_source(self, snippet):
@@ -380,16 +406,19 @@ class Wolf:
         """
         from tempfile import mkstemp
 
-        testdir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tests')
-        tmpfile_path = mkstemp(suffix=".py", text=True)[1]
+        descriptor, tmpfile_path = mkstemp(suffix=".py", text=True)
+        os.close(descriptor)
         full_path = os.path.abspath(tmpfile_path)
-        tmpfile_name = os.path.basename(tmpfile_path).split('.')[0]
-        filename = os.path.basename(tmpfile_path)
-
-        with open(full_path, 'a', encoding="utf-8") as the_file:
-            the_file.write(snippet)
-
-        return self.run(full_path, test=True) 
+        try:
+            with open(full_path, 'w', encoding="utf-8") as the_file:
+                the_file.write(snippet)
+            return self.run(full_path, test=True)
+        except BaseException:
+            try:
+                os.remove(full_path)
+            except OSError:
+                pass
+            raise
 
 
     def run(self, filename, test = False):

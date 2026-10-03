@@ -15,7 +15,6 @@
   "activationEvents": [
     "onLanguage:python"
   ],
-
   "main": "./dist/extension",
   "contributes": {
     "configuration": {
@@ -54,7 +53,7 @@
         },
         "wolf.pythonPath": {
           "type": "string",
-          "description": "A different path to python - MUST be version 3.6 or greater"
+          "description": "A different path to Python 3.8 or greater"
         }
       }
     },
@@ -207,7 +206,6 @@
     "webpack-cli": "^5.1.4",
     "ws": "^8.17.0"
   },
-
   "dependencies": {
     "js-beautify": "^1.7.5",
     "tmp": "0.0.33"

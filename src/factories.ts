@@ -35,8 +35,9 @@ export function wolfClientFactory(
   identifier: string = randomString(),
   host = '127.0.0.1',
   port = '9879',
+  authToken?: string,
 ): WolfClient {
-  return new WolfClient(host, port, identifier);
+  return new WolfClient(host, port, identifier, authToken);
 }
 
 export function wolfServerDaemonFactory(

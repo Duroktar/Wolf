@@ -1,13 +1,11 @@
-import * as path from "path";
 import * as vscode from "vscode";
 import type * as T from "./types";
 
-import * as tmp from "tmp";
 import { assert } from "console";
 
 export function fileIdentifier(
   document: vscode.TextDocument,
-): string | undefined {
+): string {
   return document.fileName.startsWith('/')
     ? document.fileName.slice(1)
     : document.fileName;
@@ -64,10 +62,3 @@ export function registerCommand(
   return vscode.commands.registerCommand(cmdName, callBack);
 }
 
-export function makeTempFile(filename: string): tmp.FileResult {
-  return tmp.fileSync({
-    dir: path.dirname(filename),
-    prefix: "/.wolf",
-    postfix: ".py"
-  });
-}

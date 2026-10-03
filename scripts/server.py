@@ -27,6 +27,7 @@ import sys
 import asyncio
 import websockets
 import concurrent.futures
+import hmac
 from datetime import datetime
 
 from wolf import Wolf
@@ -41,6 +42,10 @@ if len(sys.argv) > 2:
     wolf_port = int(sys.argv[2])
 else:
     wolf_port = int(os.environ.get('WOLF_SERVER_PORT', '9879'))
+
+wolf_token = sys.argv[3] if len(sys.argv) > 3 else os.environ.get('WOLF_SERVER_TOKEN')
+if not wolf_token:
+    raise RuntimeError('Wolf server requires an authentication token.')
 
 
 pool = concurrent.futures.ThreadPoolExecutor((os.cpu_count() or 1))
@@ -104,11 +109,21 @@ def process_raw_source(loop, websocket, source: str, path: str):
 async def handler(websocket, path: str = ""):
     server_log(path, "Client Connected")
     try:
+        authorization = getattr(websocket, 'request_headers', {}).get('Authorization')
+        expected = 'Bearer ' + wolf_token
+        if not isinstance(authorization, str) or not hmac.compare_digest(authorization, expected):
+            await websocket.close(code=1008, reason='Unauthorized')
+            server_log(path, "Rejected unauthenticated client")
+            return
+
         while True:
             message = await websocket.recv()
             data = json.loads(message)
+            if not isinstance(data, dict):
+                await websocket.send(res_400(path))
+                continue
 
-            if data.get('raw'):
+            if data.get('raw') is True and isinstance(data.get('data'), str):
                 source = data['data']
                 server_log(path, "Tracing Script")
                 response, stop = await current_loop.run_in_executor(
@@ -116,7 +131,7 @@ async def handler(websocket, path: str = ""):
                 )
                 await websocket.send(res_200_eof(response, path))
 
-            elif data.get('filepath'):
+            elif isinstance(data.get('filepath'), str) and data['filepath']:
                 filepath = data['filepath']
                 server_log(path, "Tracing File: " + filepath)
                 response, stop = await current_loop.run_in_executor(
@@ -159,7 +174,13 @@ async def main():
     global current_loop
     current_loop = asyncio.get_running_loop() if hasattr(asyncio, 'get_running_loop') else asyncio.get_event_loop()
 
-    server = await websockets.serve(handler_adapter, wolf_host, wolf_port)
+    server = await websockets.serve(
+        handler_adapter,
+        wolf_host,
+        wolf_port,
+        origins=[None],
+        max_size=8 * 1024 * 1024,
+    )
     server_log("/", f"Wolf Tracing Server Started @ http://{wolf_host}:{wolf_port}/")
     try:
         await asyncio.Future()

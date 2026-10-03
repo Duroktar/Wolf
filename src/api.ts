@@ -1,4 +1,3 @@
-import * as fs from "fs";
 import * as vscode from "vscode";
 import type * as T from "./types";
 import { EventEmitter } from "events";
@@ -9,7 +8,7 @@ import { WolfDecorationsController } from "./decorations";
 import { WolfOutputController } from "./output";
 import { consoleLoggerFactory, wolfClientFactory } from "./factories";
 
-import { fileIdentifier, getActiveEditor, makeTempFile } from "./helpers";
+import { fileIdentifier, getActiveEditor } from "./helpers";
 import { parseAndValidateResponse, parseAndValidateEofResponse } from "./helpers";
 import { nameOf, not } from "./utils";
 import { WolfClient } from "./client";
@@ -19,7 +18,8 @@ import { WolfServerDaemon } from "./server";
 export class WolfAPI {
   private _logger = consoleLoggerFactory(nameOf(WolfAPI))
   private _changedConfigFlag = false;
-  private _clients = new Array<WolfClient>()
+  private _clients = new Map<string, WolfClient>()
+  private _traceGenerations = new Map<string, number>()
   private _eventEmitter = new EventEmitter()
 
   constructor(
@@ -28,14 +28,20 @@ export class WolfAPI {
     private _decorations: WolfDecorationsController,
     private _sessions: WolfSessionController,
     private _server: WolfServerDaemon,
-  ) {}
+  ) { }
 
   public stepInWolf = (isLiveEditing = false): void => {
+    const editor = this.activeEditor;
+    const existingSession = this.sessions.get(editor.document);
+    if (existingSession) {
+      this.stopClient(editor.document);
+      this.decorations.dispose(existingSession);
+    }
     const logMessage = isLiveEditing ? 'in Live Mode' : '';
     this._logger.debug(`Starting ${logMessage}`)
     this.sessions.create({
       ...this.decorations.init(isLiveEditing),
-      editor: this.activeEditor,
+      editor,
       isLiveEditing,
     });
     this.traceAndSetDecorations();
@@ -44,27 +50,51 @@ export class WolfAPI {
 
   public stopWolf = (): void => {
     this._logger.debug('Stopping')
-    this.decorations.clearFor(
-      this.activeEditor,
-      this.activeSession,
-    );
-    this.sessions.deleteFor(this.activeEditor);
-    this.stopClient(this.activeEditor.document);
+    const editor = this.activeEditor;
+    const session = this.sessions.get(editor.document);
+    if (session) {
+      this.stopClient(editor.document);
+      this.decorations.dispose(session);
+      this.sessions.deleteFor(editor);
+    }
     this.exitWolfContext();
   };
 
   public stopSession = (document: vscode.TextDocument): void => {
     this._logger.debug('Stopping')
+    const session = this.sessions.get(document);
+    if (session)
+      this.decorations.dispose(session);
     this.sessions.deleteByName(document.fileName);
     this.stopClient(document);
-    this.exitWolfContext();
+    if (vscode.window.activeTextEditor?.document.fileName === document.fileName)
+      this.exitWolfContext();
+  };
+
+  public restartSession = (document: vscode.TextDocument): void => {
+    const existingSession = this.sessions.get(document);
+    if (!existingSession)
+      return;
+
+    const { editor, isLiveEditing } = existingSession;
+    this.stopClient(document);
+    this.decorations.dispose(existingSession);
+    this.sessions.create({
+      ...this.decorations.init(isLiveEditing),
+      editor,
+      isLiveEditing,
+    });
+    this.traceAndSetDecorations(document);
+    if (vscode.window.activeTextEditor?.document.fileName === document.fileName)
+      this.enterWolfContext();
   };
 
   public clearAll = (): void => {
     this._logger.debug('Clearing Decorations')
     for (const name of this.sessions.names) {
       const session = this.sessions.getByFileName(name);
-      this.decorations.clear(session);
+      this.stopClient(session.editor.document);
+      this.decorations.dispose(session);
     }
     this._logger.debug('Clearing Sessions')
     this.sessions.clearAll();
@@ -75,13 +105,26 @@ export class WolfAPI {
   ): void => {
     const document = textDocument ?? this.activeEditor.document;
 
-    const tempfile = makeTempFile(document.fileName);
-    fs.writeFileSync(tempfile.name, document.getText());
+    const session = this.sessions.get(document);
+    if (!session)
+      return;
 
     const clientPath = fileIdentifier(document);
-    const wolfClient = wolfClientFactory(clientPath);
+    this.stopClient(document);
+    const generation = (this._traceGenerations.get(clientPath) ?? 0) + 1;
+    this._traceGenerations.set(clientPath, generation);
+    if (session.isLiveEditing) {
+      session.decorations = {};
+      this.decorations.render(session);
+    }
 
-    this._clients.push(wolfClient);
+    const wolfClient = wolfClientFactory(
+      clientPath,
+      undefined,
+      undefined,
+      this._server.authToken,
+    );
+    this._clients.set(clientPath, wolfClient);
 
     wolfClient
       .connect()
@@ -89,7 +132,10 @@ export class WolfAPI {
         // TODO: Move handlers into a proper Disposable class
         this._logger.debug('Tracing')
 
-        const session = this.sessions.get(document)
+        if (!this.isCurrentTrace(document, session, wolfClient, generation)) {
+          wolfClient.close();
+          return;
+        }
 
         this._output.clear();
 
@@ -97,31 +143,28 @@ export class WolfAPI {
 
         if (session.isLiveEditing)
           wolfClient.on('data', (result: T.WolfClientDataResponse) => {
-            if (this.isWolfSession(document)) { // TODO: Move handlers into a proper Disposable class
+            if (this.isCurrentTrace(document, session, wolfClient, generation)) {
               this._logger.debug('Received new data')
 
               const line = parseAndValidateResponse(result);
               this.decorations.setDataAtLine(session.decorations, line)
-              this.decorations.renderTo(this.activeEditor, session);
+              this.decorations.renderTo(session.editor, session);
 
-              const filepath = this.activeEditor.document.uri.path;
+              const filepath = session.editor.document.uri.path;
               this.emit('decorations-updated', filepath, this.decorations);
             }
           })
 
         wolfClient.on('eof', (result: T.WolfClientEofResponse) => {
           this._logger.debug('Reached EOF');
+          this.removeClient(clientPath, wolfClient);
 
-          tempfile.removeCallback();
-
-          this.stopClient(session.editor.document);
-
-          if (this.isWolfSession(document)) { // TODO: Move handlers into a proper Disposable class
+          if (this.isCurrentSession(document, session, generation)) {
             const pythonData = parseAndValidateEofResponse(result);
 
             if (not(session.isLiveEditing)) {
               this.decorations.set(session, pythonData);
-              this.decorations.renderTo(this.activeEditor, session);
+              this.decorations.renderTo(session.editor, session);
 
               this._logger.debug('decorations-changed')
               this.emit('decorations-changed', document.fileName);
@@ -141,8 +184,7 @@ export class WolfAPI {
         })
 
         wolfClient.on('error', (err: Error) => {
-          tempfile.removeCallback()
-
+          this.removeClient(clientPath, wolfClient);
           this._logger.debug('Error')
           this._logger.error(err)
 
@@ -154,24 +196,23 @@ export class WolfAPI {
 
         wolfClient.on('close', () => {
           this._logger.debug('Closing')
-
-          tempfile.removeCallback()
+          this.removeClient(clientPath, wolfClient);
           this.emit('connection-closed', document.fileName);
         })
       })
       .catch(() => {
         this._logger.debug('Connection Error')
-        tempfile.removeCallback()
+        this.removeClient(clientPath, wolfClient);
         this.emit('connection-error', document.fileName);
       })
   };
 
   public reRenderDecorations = (): void => {
     this._logger.debug('re-rendering')
-    this.decorations.renderTo(
-      this.activeEditor,
-      this.sessions.get(this.activeEditor.document),
-    );
+    const editor = this.activeEditor;
+    const session = this.sessions.get(editor.document);
+    if (session)
+      this.decorations.renderTo(editor, session);
   }
 
   public isLiveEditing = (
@@ -248,7 +289,7 @@ export class WolfAPI {
   }
 
   public get updateOnSaveOnly(): boolean {
-    return this.config.get<boolean>("updateOnSaveOnly") === false;
+    return this.config.get<boolean>("updateOnSaveOnly") !== false;
   }
 
   public get shouldOutputErrors(): boolean {
@@ -308,10 +349,10 @@ export class WolfAPI {
   public dispose(): void {
     this.stopServer();
     this.clearAll();
-    for (const client of this._clients) {
+    for (const client of this._clients.values()) {
       client.close();
     }
-    this._clients = [];
+    this._clients.clear();
     this._eventEmitter.removeAllListeners();
   }
 
@@ -322,21 +363,41 @@ export class WolfAPI {
       l => {
         const msgText = `LINENO: ${l.lineno} - VALUE: ${l.value}`;
         return l.error ? `${msgText}, ERROR: ${l.error}` : msgText;
-    });
+      });
   }
 
 
+  private isCurrentSession(
+    document: vscode.TextDocument,
+    session: T.WolfSession,
+    generation: number,
+  ): boolean {
+    return this.sessions.get(document) === session &&
+      this._traceGenerations.get(fileIdentifier(document)) === generation;
+  }
+
+  private isCurrentTrace(
+    document: vscode.TextDocument,
+    session: T.WolfSession,
+    client: WolfClient,
+    generation: number,
+  ): boolean {
+    return this.isCurrentSession(document, session, generation) &&
+      this._clients.get(fileIdentifier(document)) === client;
+  }
+
   private stopClient(document: vscode.TextDocument): void {
-    const wolfClient = this._clients
-      .find(o => o.identifier === document.fileName)
+    const identifier = fileIdentifier(document);
+    const client = this._clients.get(identifier);
+    if (client)
+      this.removeClient(identifier, client);
+  }
 
-    if (wolfClient == null)
-      return
-
-    wolfClient.close()
-
-    this._clients = this._clients
-      .filter(o => o !== wolfClient)
+  private removeClient(identifier: string, client: WolfClient): void {
+    if (this._clients.get(identifier) !== client)
+      return;
+    this._clients.delete(identifier);
+    client.close();
   }
 
   public stopServer = (): void => {

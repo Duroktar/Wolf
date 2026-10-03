@@ -11,7 +11,7 @@ export function activate(context: vscode.ExtensionContext): WolfAPI {
   const output = vscode.window.createOutputChannel("Wolf");
   const wolfAPI = wolfStandardApiFactory(context, { output });
   activeWolfAPI = wolfAPI;
-  let updateTimeout: null | NodeJS.Timeout = null;
+  const updateTimeouts = new Map<string, NodeJS.Timeout>();
 
   if (not(Boolean(process.env.WOLF_TEST_SESSION ?? process.env.CI)))
     wolfAPI.startServer();
@@ -31,6 +31,7 @@ export function activate(context: vscode.ExtensionContext): WolfAPI {
     vscode.workspace.onDidChangeConfiguration(changedConfiguration),
     vscode.workspace.onDidCloseTextDocument(closedTextDocument),
     vscode.workspace.onDidSaveTextDocument(savedTextDocument),
+    { dispose: clearThrottledUpdateTimers },
   );
 
   return wolfAPI;
@@ -61,12 +62,8 @@ export function activate(context: vscode.ExtensionContext): WolfAPI {
       );
 
       wolfAPI.setChangedConfigFlag(false);
-      wolfAPI.stopWolf()
-
-      if (wolfAPI.isLiveEditing(event.document))
-        startWolfLiveMode()
-      else
-        startWolfNormal()
+      clearThrottledUpdateTimer(event.document);
+      wolfAPI.restartSession(event.document);
 
       return;
     }
@@ -94,7 +91,8 @@ export function activate(context: vscode.ExtensionContext): WolfAPI {
       return
 
     if (not(wolfAPI.isLiveEditing(event.document)))
-      throttledHandleDidChangeTextDocument(event);
+      if (!wolfAPI.updateOnSaveOnly)
+        throttledHandleDidChangeTextDocument(event);
   }
 
   function savedTextDocument(
@@ -105,14 +103,18 @@ export function activate(context: vscode.ExtensionContext): WolfAPI {
     }
 
     if (wolfAPI.isLiveEditing(document)) {
-      wolfAPI.stopWolf()
-      startWolfLiveMode()
+      clearThrottledUpdateTimer(document);
+      wolfAPI.restartSession(document);
+    } else if (wolfAPI.updateOnSaveOnly) {
+      clearThrottledUpdateTimer(document);
+      wolfAPI.traceAndSetDecorations(document);
     }
   }
 
   function closedTextDocument(
     document: vscode.TextDocument,
   ): void {
+    clearThrottledUpdateTimer(document);
     if (wolfAPI.isWolfSession(document)) {
       wolfAPI.stopSession(document)
     }
@@ -121,16 +123,31 @@ export function activate(context: vscode.ExtensionContext): WolfAPI {
   function throttledHandleDidChangeTextDocument(
     event: Pick<vscode.TextDocumentChangeEvent, 'document'>
   ): void {
-    clearThrottledUpdateTimer()
-    updateTimeout = setTimeout(
-      () => wolfAPI.traceAndSetDecorations(event.document),
+    clearThrottledUpdateTimer(event.document);
+    const filename = event.document.fileName;
+    const timeout = setTimeout(() => {
+      updateTimeouts.delete(filename);
+      if (wolfAPI.isWolfSession(event.document))
+        wolfAPI.traceAndSetDecorations(event.document);
+    },
       clamp(100, 10000, wolfAPI.updateFrequency ?? Infinity)
     );
+    updateTimeouts.set(filename, timeout);
   }
 
-  function clearThrottledUpdateTimer(): void {
-    if (updateTimeout)
-      clearTimeout(updateTimeout);
+  function clearThrottledUpdateTimer(document: vscode.TextDocument): void {
+    const filename = document.fileName;
+    const timeout = updateTimeouts.get(filename);
+    if (timeout) {
+      clearTimeout(timeout);
+      updateTimeouts.delete(filename);
+    }
+  }
+
+  function clearThrottledUpdateTimers(): void {
+    for (const timeout of updateTimeouts.values())
+      clearTimeout(timeout);
+    updateTimeouts.clear();
   }
 }
 

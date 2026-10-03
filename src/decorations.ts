@@ -12,7 +12,7 @@ import { js as beautify } from "js-beautify";
 export class WolfDecorationsController {
   private _logger = consoleLoggerFactory(nameOf(WolfDecorationsController))
 
-  constructor(private context: vscode.ExtensionContext) {}
+  constructor(private context: vscode.ExtensionContext) { }
 
   public init = (liveMode?: boolean): T.WolfSessionInit => {
     const decorationTypes = this.createDecorationTypes(
@@ -82,6 +82,14 @@ export class WolfDecorationsController {
     )
   }
 
+  public dispose = (
+    session: T.WolfSession,
+  ): void => {
+    this.clear(session);
+    session.decorationTypes.success.dispose();
+    session.decorationTypes.error.dispose();
+  }
+
   public clearFor = (
     editor: vscode.TextEditor,
     session: T.WolfSession,
@@ -130,7 +138,7 @@ export class WolfDecorationsController {
       color: decorationData.error ? "red" : "cornflower"
     });
 
-    return [ decoration, decorationData ]
+    return [decoration, decorationData]
   }
 
   private createWolfDecorationOptions = (
@@ -197,7 +205,7 @@ export class WolfDecorationsController {
       success: [] as vscode.DecorationOptions[],
       error: [] as vscode.DecorationOptions[],
     }
-    
+
     Object.keys(decorations).forEach(lineno => {
       const [
         vscodeDecoration,
