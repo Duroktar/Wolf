@@ -28,6 +28,7 @@ import re
 import json
 import traceback
 import io
+import linecache
 import threading
 import operator as py_operator
 from collections import OrderedDict
@@ -191,6 +192,49 @@ class Wolf:
         # # how it works.
         match = WOLF_REGEX.search(source)
 
+        if not match:
+            node = self.multiline_macro_statement(event, source)
+            if node is None:
+                return
+
+            m_locals_copy = {k: try_deepcopy(v) for k, v in _locals.items()}
+            m_globals_copy = {k: try_deepcopy(v) for k, v in _globals.items()}
+
+            if isinstance(node, ast.Assign):
+                expression = ast.Expression(node.value)
+                result = self.parse_eval(
+                    compile(ast.fix_missing_locations(expression), event['filename'], 'eval'),
+                    m_globals_copy,
+                    m_locals_copy,
+                    event=event,
+                )
+                if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+                    result = "{} = {}".format(node.targets[0].id, result)
+            elif isinstance(node, ast.AnnAssign) and node.value is not None:
+                expression = ast.Expression(node.value)
+                result = self.parse_eval(
+                    compile(ast.fix_missing_locations(expression), event['filename'], 'eval'),
+                    m_globals_copy,
+                    m_locals_copy,
+                    event=event,
+                )
+                if isinstance(node.target, ast.Name):
+                    result = "{} = {}".format(node.target.id, result)
+            elif isinstance(node, ast.Expr):
+                expression = ast.Expression(node.value)
+                result = self.parse_eval(
+                    compile(ast.fix_missing_locations(expression), event['filename'], 'eval'),
+                    m_globals_copy,
+                    m_locals_copy,
+                    event=event,
+                )
+            else:
+                return
+
+            metadata['value'] = self.resultifier(result)
+            self.emit_line(metadata)
+            return
+
         # Sometimes we have to skip an entry to prevent dupes
         skip = False
 
@@ -281,6 +325,35 @@ class Wolf:
             if not skip and event.kind not in ['return', 'call']:
                 # And lastly, update our WOLF results list
                 self.emit_line(metadata)
+
+
+    def multiline_macro_statement(self, event, source):
+        """Find a multiline statement whose final line carries a Wolf macro."""
+        if event.kind != 'line':
+            return None
+
+        filename = event['filename']
+        lines = linecache.getlines(filename)
+        lineno = event['lineno']
+        if not lines or lineno < 1 or lineno > len(lines):
+            return None
+
+        try:
+            module = ast.parse(''.join(lines), filename=filename)
+        except (SyntaxError, ValueError):
+            return None
+
+        candidates = [
+            node for node in ast.walk(module)
+            if isinstance(node, ast.stmt)
+            and node.lineno == lineno
+            and getattr(node, 'end_lineno', node.lineno) > lineno
+            and re.search(r'#\s?\?[^\r\n]*$', lines[node.end_lineno - 1])
+        ]
+        if not candidates:
+            return None
+
+        return min(candidates, key=lambda node: node.end_lineno - node.lineno)
 
 
     def parse_eval(self, *args, **kw):

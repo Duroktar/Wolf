@@ -32,6 +32,19 @@ class StabilizationTests(unittest.TestCase):
                 result = json.loads(Wolf().test("value = 1\n{}  #?".format(statement)))
                 self.assertTrue(any(line["value"] == expected for line in result), result)
 
+    def test_multiline_assignment_macro_on_closing_line(self):
+        snippet = '''profile = {
+    "name": "Ada",
+    "language": "Python",
+    "active": True,
+}  #?
+'''
+        result = json.loads(Wolf().test(snippet))
+        self.assertTrue(
+            any(line["value"].startswith("profile = {") and "Ada" in line["value"] for line in result),
+            result,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

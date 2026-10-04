@@ -99,6 +99,7 @@ celerybeat-schedule
 # Environments
 .env
 .venv
+.venv-pytest/
 env/
 venv/
 ENV/
