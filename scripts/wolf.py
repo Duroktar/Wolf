@@ -64,6 +64,13 @@ WOLF_REGEX = re.compile(
 # https://regex101.com/r/sf6nAH/2
 
 
+class WolfEvaluationError(Exception):
+    def __init__(self, event, error_message):
+        self.event = event
+        self.error = error_message
+        super(WolfEvaluationError, self).__init__(error_message)
+
+
 def import_file(full_name, fullpath):
     """
         The "recommended" method of importing a file by its
@@ -163,168 +170,194 @@ class Wolf:
             filter. ie: trace => filter => result_handler
         """
 
-        # We don't want any whitespace around our
-        # source code that could mess up the parser.
-        source = event['source'].strip()
+        try:
+            # We don't want any whitespace around our
+            # source code that could mess up the parser.
+            source = event['source'].strip()
 
-        # These are the fields returned from each line
-        # of the traced program. This is essentially
-        # the metadata returned to the extension in the
-        # WOLF list.
-        metadata = OrderedDict([
-            ("lineno",             event['lineno']),
-            # "value"    <-  Defined below MAYBE..
-        ])
+            # These are the fields returned from each line
+            # of the traced program. This is essentially
+            # the metadata returned to the extension in the
+            # WOLF list.
+            metadata = OrderedDict([
+                ("lineno",             event['lineno']),
+                # "value"    <-  Defined below MAYBE..
+            ])
 
-        # The annotation will take on this value
-        # (if present).
-        value = None
+            # The annotation will take on this value
+            # (if present).
+            value = None
 
-        # We'll need to look up any values in the
-        # correct scope, so let's grab the locals
-        # and globals from the current frame to
-        # use later on.
-        _globals = event['globals']
-        _locals = event['locals']
+            # We'll need to look up any values in the
+            # correct scope, so let's grab the locals
+            # and globals from the current frame to
+            # use later on.
+            _globals = event['globals']
+            _locals = event['locals']
 
-        # This regex does all the heavy lifting. Check out
-        # https://regex101.com/r/npWf6w/5 for an example of
-        # # how it works.
-        match = WOLF_REGEX.search(source)
+            # This regex does all the heavy lifting. Check out
+            # https://regex101.com/r/npWf6w/5 for an example of
+            # # how it works.
+            match = WOLF_REGEX.search(source)
 
-        if not match:
-            node = self.multiline_macro_statement(event, source)
-            if node is None:
-                return
+            if not match:
+                node = self.multiline_macro_statement(event, source)
+                if node is None:
+                    return
 
-            m_locals_copy = {k: try_deepcopy(v) for k, v in _locals.items()}
-            m_globals_copy = {k: try_deepcopy(v) for k, v in _globals.items()}
-
-            if isinstance(node, ast.Assign):
-                expression = ast.Expression(node.value)
-                result = self.parse_eval(
-                    compile(ast.fix_missing_locations(expression), event['filename'], 'eval'),
-                    m_globals_copy,
-                    m_locals_copy,
-                    event=event,
-                )
-                if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
-                    result = "{} = {}".format(node.targets[0].id, result)
-            elif isinstance(node, ast.AnnAssign) and node.value is not None:
-                expression = ast.Expression(node.value)
-                result = self.parse_eval(
-                    compile(ast.fix_missing_locations(expression), event['filename'], 'eval'),
-                    m_globals_copy,
-                    m_locals_copy,
-                    event=event,
-                )
-                if isinstance(node.target, ast.Name):
-                    result = "{} = {}".format(node.target.id, result)
-            elif isinstance(node, ast.Expr):
-                expression = ast.Expression(node.value)
-                result = self.parse_eval(
-                    compile(ast.fix_missing_locations(expression), event['filename'], 'eval'),
-                    m_globals_copy,
-                    m_locals_copy,
-                    event=event,
-                )
-            else:
-                return
-
-            metadata['value'] = self.resultifier(result)
-            self.emit_line(metadata)
-            return
-
-        # Sometimes we have to skip an entry to prevent dupes
-        skip = False
-
-        # Regex match groups are used for convenience.
-        if source not in ['pass', 'break', 'continue'] and match: # fixes https://github.com/Duroktar/Wolf/issues/28 to 30
-
-            # TODO: We should be using the ast instead of regex for all cases.
-            tree = ast.parse(source)
-
-            # Simplest case.
-            if match.group('variable'):
-                if event.kind != 'call':
-                    value = self.parse_eval(match.group('variable'),
-                                    _globals, _locals, event=event)
-                    metadata["source"] = event['source'],
-                else:
-                    skip = True
-
-            elif match.group('print'):
-                buffer = io.StringIO()
-                try:
-                    # A little magic to parse print args (fixes https://github.com/Duroktar/Wolf/issues/34)
-                    src_seg = unparse(tree).strip()
-                    to_eval = "print({}, file=wolf__buffer__)".format(src_seg[6:-1])
-                    exec(to_eval, _globals, {**_locals, 'wolf__buffer__': buffer})
-                    value = str(buffer.getvalue()).strip('\n')
-                finally:
-                    buffer.close()
-
-            # Macros require a few more steps..
-            elif match.group('macro'):
-
-                # XXX: This is to help avoid side effects when evaluating expressions
                 m_locals_copy = {k: try_deepcopy(v) for k, v in _locals.items()}
                 m_globals_copy = {k: try_deepcopy(v) for k, v in _globals.items()}
 
-                if isinstance(tree.body[0], (ast.Assign, ast.AugAssign)):
-                    node = tree.body[0]
+                if isinstance(node, ast.Assign):
+                    expression = ast.Expression(node.value)
+                    result = self.parse_eval(
+                        compile(ast.fix_missing_locations(expression), event['filename'], 'eval'),
+                        m_globals_copy,
+                        m_locals_copy,
+                        event=event,
+                    )
+                    if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+                        result = "{} = {}".format(node.targets[0].id, result)
+                elif isinstance(node, ast.AnnAssign) and node.value is not None:
+                    expression = ast.Expression(node.value)
+                    result = self.parse_eval(
+                        compile(ast.fix_missing_locations(expression), event['filename'], 'eval'),
+                        m_globals_copy,
+                        m_locals_copy,
+                        event=event,
+                    )
+                    if isinstance(node.target, ast.Name):
+                        result = "{} = {}".format(node.target.id, result)
+                elif isinstance(node, ast.Expr):
+                    expression = ast.Expression(node.value)
+                    result = self.parse_eval(
+                        compile(ast.fix_missing_locations(expression), event['filename'], 'eval'),
+                        m_globals_copy,
+                        m_locals_copy,
+                        event=event,
+                    )
+                else:
+                    return
 
-                    if isinstance(node, ast.AugAssign):
-                        target = node.target
+                metadata['value'] = self.resultifier(result)
+                self.emit_line(metadata)
+                return
+
+            # Sometimes we have to skip an entry to prevent dupes
+            skip = False
+
+            # Regex match groups are used for convenience.
+            if source not in ['pass', 'break', 'continue'] and match: # fixes https://github.com/Duroktar/Wolf/issues/28 to 30
+
+                # TODO: We should be using the ast instead of regex for all cases.
+                tree = ast.parse(source)
+
+                # Simplest case.
+                if match.group('variable'):
+                    if event.kind != 'call':
+                        value = self.parse_eval(match.group('variable'),
+                                        _globals, _locals, event=event)
+                        metadata["source"] = event['source'],
                     else:
-                        target = node.targets[0]
+                        skip = True
 
-                    if isinstance(target, ast.Name):
-                        local_name = target.id
+                elif match.group('print'):
+                    buffer = io.StringIO()
+                    try:
+                        # A little magic to parse print args (fixes https://github.com/Duroktar/Wolf/issues/34)
+                        src_seg = unparse(tree).strip()
+                        to_eval = "print({}, file=wolf__buffer__)".format(src_seg[6:-1])
+                        exec(to_eval, _globals, {**_locals, 'wolf__buffer__': buffer})
+                        value = str(buffer.getvalue()).strip('\n')
+                    finally:
+                        buffer.close()
+
+                # Macros require a few more steps..
+                elif match.group('macro'):
+
+                    # XXX: This is to help avoid side effects when evaluating expressions
+                    m_locals_copy = {k: try_deepcopy(v) for k, v in _locals.items()}
+                    m_globals_copy = {k: try_deepcopy(v) for k, v in _globals.items()}
+
+                    if isinstance(tree.body[0], (ast.Assign, ast.AugAssign)):
+                        node = tree.body[0]
 
                         if isinstance(node, ast.AugAssign):
-                            operation = {
-                                ast.Add: py_operator.add,
-                                ast.Sub: py_operator.sub,
-                                ast.Mult: py_operator.mul,
-                                ast.Div: py_operator.truediv,
-                                ast.FloorDiv: py_operator.floordiv,
-                                ast.Mod: py_operator.mod,
-                                ast.Pow: py_operator.pow,
-                                ast.BitAnd: py_operator.and_,
-                                ast.BitOr: py_operator.or_,
-                                ast.BitXor: py_operator.xor,
-                                ast.LShift: py_operator.lshift,
-                                ast.RShift: py_operator.rshift,
-                            }.get(type(node.op))
-                            if operation is None:
-                                value = self.parse_eval(match.group('macro').strip(), m_globals_copy, m_locals_copy, event=event)
-                            else:
-                                left = self.parse_eval(local_name, m_globals_copy, m_locals_copy, event=event)
-                                right = self.parse_eval(unparse(node.value), m_globals_copy, m_locals_copy, event=event)
-                                value = operation(left, right)
+                            target = node.target
                         else:
-                            right_side_value = source[source.index('=')+1:].strip()
-                            value = self.parse_eval(right_side_value, m_globals_copy, m_locals_copy, event=event)
+                            target = node.targets[0]
 
-                        # Show the value after the assignment without repeating its side effects.
-                        value = "{} = {}".format(local_name, value)
+                        if isinstance(target, ast.Name):
+                            local_name = target.id
+
+                            if isinstance(node, ast.AugAssign):
+                                operation = {
+                                    ast.Add: py_operator.add,
+                                    ast.Sub: py_operator.sub,
+                                    ast.Mult: py_operator.mul,
+                                    ast.Div: py_operator.truediv,
+                                    ast.FloorDiv: py_operator.floordiv,
+                                    ast.Mod: py_operator.mod,
+                                    ast.Pow: py_operator.pow,
+                                    ast.BitAnd: py_operator.and_,
+                                    ast.BitOr: py_operator.or_,
+                                    ast.BitXor: py_operator.xor,
+                                    ast.LShift: py_operator.lshift,
+                                    ast.RShift: py_operator.rshift,
+                                }.get(type(node.op))
+                                if operation is None:
+                                    value = self.parse_eval(match.group('macro').strip(), m_globals_copy, m_locals_copy, event=event)
+                                else:
+                                    left = self.parse_eval(local_name, m_globals_copy, m_locals_copy, event=event)
+                                    right = self.parse_eval(unparse(node.value), m_globals_copy, m_locals_copy, event=event)
+                                    value = operation(left, right)
+                            else:
+                                right_side_value = source[source.index('=')+1:].strip()
+                                value = self.parse_eval(right_side_value, m_globals_copy, m_locals_copy, event=event)
+
+                            # Show the value after the assignment without repeating its side effects.
+                            value = "{} = {}".format(local_name, value)
+                        else:
+                            value = self.parse_eval(match.group('macro').strip(), m_globals_copy, m_locals_copy, event=event)
+
                     else:
+                        # Basic macro evaluation
                         value = self.parse_eval(match.group('macro').strip(), m_globals_copy, m_locals_copy, event=event)
-
                 else:
                     # Basic macro evaluation
                     value = self.parse_eval(match.group('macro').strip(), m_globals_copy, m_locals_copy, event=event)
-            else:
-                # Basic macro evaluation
-                value = self.parse_eval(match.group('macro').strip(), m_globals_copy, m_locals_copy, event=event)
 
-            # Final results are formatted
-            metadata['value'] = self.resultifier(value)
+                # Final results are formatted
+                metadata['value'] = self.resultifier(value)
 
-            if not skip and event.kind not in ['return', 'call']:
-                # And lastly, update our WOLF results list
-                self.emit_line(metadata)
+                if not skip and event.kind not in ['return', 'call']:
+                    # And lastly, update our WOLF results list
+                    self.emit_line(metadata)
+        except WolfEvaluationError as exc:
+            self.emit_error(event, exc.error)
+            return
+
+    def emit_error(self, event, error_message):
+        source = event.get('source', '').strip()
+        metadata = OrderedDict([
+            ("lineno", event.get('lineno')),
+            ("source", source),
+            ("value", error_message.splitlines()[0] if error_message else ""),
+            ("error", error_message),
+        ])
+        self.emit_line(metadata)
+
+    def parse_eval(self, *args, **kw):
+        event = kw.get('event')
+
+        try:
+            return eval(*args)
+        except BaseException as e:
+            if event and event.get('kind') == 'line':
+                thrown = traceback.format_exception_only(type(e), e)
+                error = '\n'.join(thrown)
+                raise WolfEvaluationError(event, error)
+            raise
 
 
     def multiline_macro_statement(self, event, source):
@@ -338,47 +371,54 @@ class Wolf:
         if not lines or lineno < 1 or lineno > len(lines):
             return None
 
+        macro_lineno = None
+        tail_pattern = re.compile(r'#\s?\?[^\r\n]*$')
+
+        if tail_pattern.search(lines[lineno - 1]):
+            macro_lineno = lineno
+        elif lineno < len(lines) and tail_pattern.search(lines[lineno]):
+            macro_lineno = lineno + 1
+        else:
+            return None
+
         try:
             module = ast.parse(''.join(lines), filename=filename)
         except (SyntaxError, ValueError):
             return None
 
-        candidates = [
-            node for node in ast.walk(module)
-            if isinstance(node, ast.stmt)
-            and node.lineno == lineno
-            and getattr(node, 'end_lineno', node.lineno) > lineno
-            and re.search(r'#\s?\?[^\r\n]*$', lines[node.end_lineno - 1])
-        ]
+        candidates = []
+        for node in ast.walk(module):
+            if not isinstance(node, ast.stmt):
+                continue
+
+            if sys.version_info >= (3, 8):
+                end_lineno = getattr(node, 'end_lineno', node.lineno)
+                if end_lineno != macro_lineno:
+                    continue
+            else:
+                # Python < 3.8 does not give reliable end-of-statement spans for the
+                # full assignment expression, so we use the most recent statement that
+                # starts before the macro line instead.
+                if node.lineno >= macro_lineno:
+                    continue
+
+                statement_source = ''.join(lines[node.lineno - 1:macro_lineno])
+                try:
+                    statement_tree = ast.parse(statement_source, filename=filename)
+                except (SyntaxError, ValueError):
+                    continue
+
+                if len(statement_tree.body) != 1:
+                    continue
+
+            candidates.append(node)
+
         if not candidates:
             return None
 
-        return min(candidates, key=lambda node: node.end_lineno - node.lineno)
-
-
-    def parse_eval(self, *args, **kw):
-        event = kw.get('event')
-
-        try:
-            rv = eval(*args)
-        except BaseException as e:
-            if event['kind'] == 'line':
-                thrown = traceback.format_exception_only(type(e), e)
-                error = '\n'.join(thrown)
-                source = event['source'].strip()
-                metadata = OrderedDict([
-                    ("lineno",              event['lineno']),
-                    ("source",                       source),
-                    ("value",                     thrown[0]),
-                    ("error",                         error),
-                    # ("filename",          event['filename']),
-                ])
-
-                self.emit_line(metadata)
-                self.wolf_prints()
-                sys.exit(0)
-        else:
-            return rv
+        if sys.version_info >= (3, 8):
+            return max(candidates, key=lambda node: (getattr(node, 'end_lineno', node.lineno), node.lineno))
+        return max(candidates, key=lambda node: node.lineno)
 
 
     def emit_line(self, metadata):

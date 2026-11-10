@@ -25,6 +25,7 @@ import json
 import os
 import sys
 import asyncio
+import subprocess
 import websockets
 import concurrent.futures
 import hmac
@@ -90,7 +91,14 @@ def process_python_script(loop, websocket, filepath: str):
 
 
 def process_raw_source(loop, websocket, source: str, path: str):
-    wolf = Wolf()
+    worker_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'worker.py')
+    process = subprocess.Popen(
+        [sys.executable, worker_path],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        universal_newlines=True,
+        bufsize=1,
+    )
 
     def handle_emit(line):
         try:
@@ -102,8 +110,39 @@ def process_raw_source(loop, websocket, source: str, path: str):
         except Exception as e:
             server_log(path, f"Error emitting line: {e}")
 
-    wolf.add_listener(handle_emit)
-    return wolf.run_for_source(source), False
+    completed_output = None
+    worker_error = None
+    try:
+        process.stdin.write(json.dumps({"source": source}) + '\n')
+        process.stdin.close()
+
+        for output_line in process.stdout:
+            record = json.loads(output_line)
+            if record.get('type') == 'line':
+                handle_emit(record.get('data'))
+            elif record.get('type') == 'complete':
+                completed_output = record.get('output')
+            elif record.get('type') == 'error':
+                worker_error = record.get('message', 'Worker failed')
+
+        return_code = process.wait()
+        if worker_error:
+            raise RuntimeError(worker_error)
+        if return_code != 0 or not isinstance(completed_output, str):
+            raise RuntimeError('Wolf worker exited without a completion record')
+        return completed_output, False
+    finally:
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait()
+        if process.stdin and not process.stdin.closed:
+            process.stdin.close()
+        if process.stdout:
+            process.stdout.close()
 
 
 async def handler(websocket, path: str = ""):

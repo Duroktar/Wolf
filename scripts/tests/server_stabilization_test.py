@@ -9,6 +9,17 @@ import unittest
 import websockets
 
 
+def run_async(coro):
+    try:
+        return asyncio.run(coro)
+    except AttributeError:
+        loop = asyncio.new_event_loop()
+        try:
+            return loop.run_until_complete(coro)
+        finally:
+            loop.close()
+
+
 class LocalServerSecurityTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -22,7 +33,7 @@ class LocalServerSecurityTests(unittest.TestCase):
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
-        asyncio.run(cls._wait_until_ready())
+        run_async(cls._wait_until_ready())
 
     @classmethod
     def tearDownClass(cls):
@@ -62,7 +73,7 @@ class LocalServerSecurityTests(unittest.TestCase):
                     if response.get("eof"):
                         return response
 
-        result = asyncio.run(run_trace())
+        result = run_async(run_trace())
         self.assertEqual(result["statusCode"], 200)
         self.assertIsInstance(json.loads(result["total_output"]), list)
 
@@ -73,7 +84,7 @@ class LocalServerSecurityTests(unittest.TestCase):
                 await websocket.recv()
 
         with self.assertRaises(websockets.exceptions.ConnectionClosed):
-            asyncio.run(connect_without_token())
+            run_async(connect_without_token())
 
     def test_browser_origin_is_rejected(self):
         async def connect_with_origin():
@@ -86,7 +97,7 @@ class LocalServerSecurityTests(unittest.TestCase):
                 pass
 
         with self.assertRaises(websockets.exceptions.InvalidStatusCode):
-            asyncio.run(connect_with_origin())
+            run_async(connect_with_origin())
 
 
 if __name__ == "__main__":
