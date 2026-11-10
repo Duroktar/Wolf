@@ -5,6 +5,7 @@ import socket
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 import websockets
@@ -30,7 +31,7 @@ class LocalServerSecurityTests(unittest.TestCase):
         cls.token = "test-token-for-wolf"
         server_path = os.path.join(os.path.dirname(__file__), "..", "server.py")
         env = os.environ.copy()
-        env["WOLF_WORKER_TIMEOUT"] = "1"
+        env["WOLF_WORKER_TIMEOUT"] = "3"
         cls.process = subprocess.Popen(
             [sys.executable, server_path, "127.0.0.1", str(cls.port), cls.token],
             stdout=subprocess.DEVNULL,
@@ -132,6 +133,51 @@ class LocalServerSecurityTests(unittest.TestCase):
         self.assertEqual(result["statusCode"], 500)
         next_result = run_async(run_normal_trace())
         self.assertEqual(next_result["statusCode"], 200)
+
+    @unittest.skipIf(os.name == "nt", "PID liveness probing uses POSIX os.kill semantics")
+    def test_disconnect_terminates_worker_before_timeout(self):
+        with tempfile.NamedTemporaryFile(delete=False) as pid_file:
+            pid_path = pid_file.name
+        os.unlink(pid_path)
+
+        source = (
+            "import os\n"
+            "with open({!r}, 'w') as pid_file:\n"
+            "    pid_file.write(str(os.getpid()))\n"
+            "while True:\n"
+            "    pass\n"
+        ).format(pid_path)
+
+        async def disconnect_during_trace():
+            uri = "ws://127.0.0.1:{}/test".format(self.port)
+            async with websockets.connect(
+                uri,
+                extra_headers={"Authorization": "Bearer " + self.token},
+            ) as websocket:
+                await websocket.send(json.dumps({"raw": True, "data": source}))
+                for _ in range(100):
+                    if os.path.exists(pid_path):
+                        break
+                    await asyncio.sleep(0.02)
+                self.assertTrue(os.path.exists(pid_path), "worker did not start")
+                with open(pid_path) as pid_file:
+                    worker_pid = int(pid_file.read())
+                await websocket.close()
+                return worker_pid
+
+        try:
+            worker_pid = run_async(disconnect_during_trace())
+            deadline = time.time() + 1.5
+            while time.time() < deadline:
+                try:
+                    os.kill(worker_pid, 0)
+                except OSError:
+                    return
+                time.sleep(0.02)
+            self.fail("worker remained alive after its client disconnected")
+        finally:
+            if os.path.exists(pid_path):
+                os.unlink(pid_path)
 
     def test_unauthorized_client_is_closed(self):
         async def connect_without_token():

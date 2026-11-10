@@ -54,6 +54,10 @@ current_loop = None
 WORKER_TIMEOUT_SECONDS = float(os.environ.get('WOLF_WORKER_TIMEOUT', '30'))
 
 
+class WorkerCancelled(Exception):
+    """Raised when a trace client disconnects before its worker completes."""
+
+
 def server_log(path: str, message):
     print(f"[{datetime.now().isoformat()}] path={path} -- {message}")
 
@@ -74,7 +78,7 @@ def res_500(path: str):
     return json.dumps({"statusCode": 500, "message": "Internal Server Error", "path": path})
 
 
-def process_worker_request(loop, websocket, request, path: str):
+def process_worker_request(loop, websocket, request, path: str, cancellation_event=None):
     worker_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'worker.py')
     process = subprocess.Popen(
         [sys.executable, worker_path],
@@ -109,30 +113,46 @@ def process_worker_request(loop, websocket, request, path: str):
     completed_output = None
     worker_error = None
     deadline = time.time() + WORKER_TIMEOUT_SECONDS
+
+    def check_cancelled():
+        if cancellation_event is not None and cancellation_event.is_set():
+            raise WorkerCancelled('Trace client disconnected')
+
     try:
         process.stdin.write(json.dumps(request) + '\n')
         process.stdin.close()
 
         while True:
+            check_cancelled()
             remaining = deadline - time.time()
             if remaining <= 0:
                 raise subprocess.TimeoutExpired(process.args, WORKER_TIMEOUT_SECONDS)
             try:
-                output_line = output_lines.get(timeout=remaining)
+                output_line = output_lines.get(timeout=min(remaining, 0.1))
             except queue.Empty:
-                raise subprocess.TimeoutExpired(process.args, WORKER_TIMEOUT_SECONDS)
+                continue
             if output_line is None:
                 break
 
             record = json.loads(output_line)
             if record.get('type') == 'line':
+                check_cancelled()
                 handle_emit(record.get('data'))
             elif record.get('type') == 'complete':
                 completed_output = record.get('output')
             elif record.get('type') == 'error':
                 worker_error = record.get('message', 'Worker failed')
 
-        return_code = process.wait(timeout=max(0, deadline - time.time()))
+        while True:
+            check_cancelled()
+            remaining = deadline - time.time()
+            if remaining <= 0:
+                raise subprocess.TimeoutExpired(process.args, WORKER_TIMEOUT_SECONDS)
+            try:
+                return_code = process.wait(timeout=min(remaining, 0.1))
+                break
+            except subprocess.TimeoutExpired:
+                continue
         if worker_error:
             raise RuntimeError(worker_error)
         if return_code != 0 or not isinstance(completed_output, str):
@@ -153,12 +173,39 @@ def process_worker_request(loop, websocket, request, path: str):
         reader.join(timeout=1)
 
 
-def process_raw_source(loop, websocket, source: str, path: str):
-    return process_worker_request(loop, websocket, {"source": source}, path)
+async def run_worker_for_websocket(websocket, request, path: str):
+    cancellation_event = threading.Event()
+    worker_future = current_loop.run_in_executor(
+        pool,
+        process_worker_request,
+        current_loop,
+        websocket,
+        request,
+        path,
+        cancellation_event,
+    )
+    closed_future = asyncio.ensure_future(websocket.wait_closed())
+    done, _ = await asyncio.wait(
+        [worker_future, closed_future],
+        return_when=asyncio.FIRST_COMPLETED,
+    )
 
+    if worker_future in done:
+        closed_future.cancel()
+        try:
+            await closed_future
+        except asyncio.CancelledError:
+            pass
+        return await worker_future
 
-def process_python_script(loop, websocket, filepath: str):
-    return process_worker_request(loop, websocket, {"filepath": filepath}, filepath)
+    cancellation_event.set()
+    try:
+        await worker_future
+    except WorkerCancelled:
+        pass
+    except Exception as exc:
+        server_log(path, 'Worker stopped after client disconnect: {}'.format(exc))
+    return None
 
 
 async def handler(websocket, path: str = ""):
@@ -181,17 +228,23 @@ async def handler(websocket, path: str = ""):
             if data.get('raw') is True and isinstance(data.get('data'), str):
                 source = data['data']
                 server_log(path, "Tracing Script")
-                response, stop = await current_loop.run_in_executor(
-                    pool, process_raw_source, current_loop, websocket, source, path
+                response = await run_worker_for_websocket(
+                    websocket, {"source": source}, path
                 )
+                if response is None:
+                    return
+                response, stop = response
                 await websocket.send(res_200_eof(response, path))
 
             elif isinstance(data.get('filepath'), str) and data['filepath']:
                 filepath = data['filepath']
                 server_log(path, "Tracing File: " + filepath)
-                response, stop = await current_loop.run_in_executor(
-                    pool, process_python_script, current_loop, websocket, filepath
+                response = await run_worker_for_websocket(
+                    websocket, {"filepath": filepath}, filepath
                 )
+                if response is None:
+                    return
+                response, stop = response
                 await websocket.send(res_200_eof(response, path))
 
             else:
