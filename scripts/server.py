@@ -26,13 +26,13 @@ import os
 import sys
 import asyncio
 import subprocess
+import queue
+import threading
+import time
 import websockets
 import concurrent.futures
 import hmac
 from datetime import datetime
-
-from wolf import Wolf
-
 
 if len(sys.argv) > 1:
     wolf_host = sys.argv[1]
@@ -51,6 +51,7 @@ if not wolf_token:
 
 pool = concurrent.futures.ThreadPoolExecutor((os.cpu_count() or 1))
 current_loop = None
+WORKER_TIMEOUT_SECONDS = float(os.environ.get('WOLF_WORKER_TIMEOUT', '30'))
 
 
 def server_log(path: str, message):
@@ -73,24 +74,7 @@ def res_500(path: str):
     return json.dumps({"statusCode": 500, "message": "Internal Server Error", "path": path})
 
 
-def process_python_script(loop, websocket, filepath: str):
-    wolf = Wolf()
-
-    def handle_emit(line):
-        try:
-            future = asyncio.run_coroutine_threadsafe(
-                websocket.send(res_200(json.dumps(line), filepath)),
-                loop
-            )
-            future.result(timeout=5)
-        except Exception as e:
-            server_log(filepath, f"Error emitting line: {e}")
-
-    wolf.add_listener(handle_emit)
-    return wolf.run(filepath, test=True), False
-
-
-def process_raw_source(loop, websocket, source: str, path: str):
+def process_worker_request(loop, websocket, request, path: str):
     worker_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'worker.py')
     process = subprocess.Popen(
         [sys.executable, worker_path],
@@ -99,6 +83,18 @@ def process_raw_source(loop, websocket, source: str, path: str):
         universal_newlines=True,
         bufsize=1,
     )
+    output_lines = queue.Queue()
+
+    def read_worker_output():
+        try:
+            for output_line in process.stdout:
+                output_lines.put(output_line)
+        finally:
+            output_lines.put(None)
+
+    reader = threading.Thread(target=read_worker_output)
+    reader.daemon = True
+    reader.start()
 
     def handle_emit(line):
         try:
@@ -112,11 +108,22 @@ def process_raw_source(loop, websocket, source: str, path: str):
 
     completed_output = None
     worker_error = None
+    deadline = time.time() + WORKER_TIMEOUT_SECONDS
     try:
-        process.stdin.write(json.dumps({"source": source}) + '\n')
+        process.stdin.write(json.dumps(request) + '\n')
         process.stdin.close()
 
-        for output_line in process.stdout:
+        while True:
+            remaining = deadline - time.time()
+            if remaining <= 0:
+                raise subprocess.TimeoutExpired(process.args, WORKER_TIMEOUT_SECONDS)
+            try:
+                output_line = output_lines.get(timeout=remaining)
+            except queue.Empty:
+                raise subprocess.TimeoutExpired(process.args, WORKER_TIMEOUT_SECONDS)
+            if output_line is None:
+                break
+
             record = json.loads(output_line)
             if record.get('type') == 'line':
                 handle_emit(record.get('data'))
@@ -125,7 +132,7 @@ def process_raw_source(loop, websocket, source: str, path: str):
             elif record.get('type') == 'error':
                 worker_error = record.get('message', 'Worker failed')
 
-        return_code = process.wait()
+        return_code = process.wait(timeout=max(0, deadline - time.time()))
         if worker_error:
             raise RuntimeError(worker_error)
         if return_code != 0 or not isinstance(completed_output, str):
@@ -143,6 +150,15 @@ def process_raw_source(loop, websocket, source: str, path: str):
             process.stdin.close()
         if process.stdout:
             process.stdout.close()
+        reader.join(timeout=1)
+
+
+def process_raw_source(loop, websocket, source: str, path: str):
+    return process_worker_request(loop, websocket, {"source": source}, path)
+
+
+def process_python_script(loop, websocket, filepath: str):
+    return process_worker_request(loop, websocket, {"filepath": filepath}, filepath)
 
 
 async def handler(websocket, path: str = ""):

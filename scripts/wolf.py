@@ -534,7 +534,7 @@ class Wolf:
             raise
 
 
-    def run(self, filename, test = False):
+    def run(self, filename, test = False, remove_file = True):
         """
             Simply ensures the target script exists and calls
             the import_and_trace_script function. The results
@@ -638,13 +638,13 @@ class Wolf:
         if test:
             res = self.wolf_formats()
             self.WOLF.clear()
-            try:
-                os.remove(full_path)
-            except PermissionError:
-                # NBD, this can fail on Windows CI tests..
-                pass
-            finally:
-                return res 
+            if remove_file:
+                try:
+                    os.remove(full_path)
+                except PermissionError:
+                    # NBD, this can fail on Windows CI tests..
+                    pass
+            return res
 
         # print the results and return a 0 for the exit code
         self.wolf_prints()

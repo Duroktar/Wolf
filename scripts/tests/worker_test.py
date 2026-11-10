@@ -2,6 +2,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import unittest
 
 
@@ -46,6 +47,23 @@ class WorkerProtocolTests(unittest.TestCase):
         self.assertEqual(len(records), 1)
         self.assertEqual(records[0]["type"], "error")
         self.assertIn("string 'source'", records[0]["message"])
+
+    def test_filepath_request_preserves_script_and_completes(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as script:
+            script.write("answer = 42  #?\n")
+            filepath = script.name
+
+        try:
+            completed = self.run_worker({"filepath": filepath})
+
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            self.assertTrue(os.path.isfile(filepath))
+            records = [json.loads(line) for line in completed.stdout.splitlines()]
+            self.assertEqual(records[-1]["type"], "complete")
+            self.assertTrue(any(record["type"] == "line" for record in records[:-1]))
+            self.assertIsInstance(json.loads(records[-1]["output"]), list)
+        finally:
+            os.unlink(filepath)
 
 
 if __name__ == "__main__":

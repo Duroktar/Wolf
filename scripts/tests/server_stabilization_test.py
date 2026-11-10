@@ -4,6 +4,7 @@ import os
 import socket
 import subprocess
 import sys
+import tempfile
 import unittest
 
 import websockets
@@ -28,10 +29,13 @@ class LocalServerSecurityTests(unittest.TestCase):
             cls.port = sock.getsockname()[1]
         cls.token = "test-token-for-wolf"
         server_path = os.path.join(os.path.dirname(__file__), "..", "server.py")
+        env = os.environ.copy()
+        env["WOLF_WORKER_TIMEOUT"] = "1"
         cls.process = subprocess.Popen(
             [sys.executable, server_path, "127.0.0.1", str(cls.port), cls.token],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
+            env=env,
         )
         run_async(cls._wait_until_ready())
 
@@ -76,6 +80,58 @@ class LocalServerSecurityTests(unittest.TestCase):
         result = run_async(run_trace())
         self.assertEqual(result["statusCode"], 200)
         self.assertIsInstance(json.loads(result["total_output"]), list)
+
+    def test_authenticated_filepath_trace_preserves_script(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as script:
+            script.write("answer = 42  #?\n")
+            filepath = script.name
+
+        async def run_trace():
+            uri = "ws://127.0.0.1:{}/test".format(self.port)
+            async with websockets.connect(
+                uri,
+                extra_headers={"Authorization": "Bearer " + self.token},
+            ) as websocket:
+                await websocket.send(json.dumps({"filepath": filepath}))
+                while True:
+                    response = json.loads(await websocket.recv())
+                    if response.get("eof"):
+                        return response
+
+        try:
+            result = run_async(run_trace())
+            self.assertEqual(result["statusCode"], 200)
+            self.assertTrue(os.path.isfile(filepath))
+            self.assertIsInstance(json.loads(result["total_output"]), list)
+        finally:
+            os.unlink(filepath)
+
+    def test_worker_timeout_returns_error_and_server_remains_available(self):
+        async def run_timeout_trace():
+            uri = "ws://127.0.0.1:{}/test".format(self.port)
+            async with websockets.connect(
+                uri,
+                extra_headers={"Authorization": "Bearer " + self.token},
+            ) as websocket:
+                await websocket.send(json.dumps({"raw": True, "data": "while True:\n    pass"}))
+                return json.loads(await websocket.recv())
+
+        async def run_normal_trace():
+            uri = "ws://127.0.0.1:{}/test".format(self.port)
+            async with websockets.connect(
+                uri,
+                extra_headers={"Authorization": "Bearer " + self.token},
+            ) as websocket:
+                await websocket.send(json.dumps({"raw": True, "data": "answer = 42  #?"}))
+                while True:
+                    response = json.loads(await websocket.recv())
+                    if response.get("eof"):
+                        return response
+
+        result = run_async(run_timeout_trace())
+        self.assertEqual(result["statusCode"], 500)
+        next_result = run_async(run_normal_trace())
+        self.assertEqual(next_result["statusCode"], 200)
 
     def test_unauthorized_client_is_closed(self):
         async def connect_without_token():

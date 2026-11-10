@@ -26,10 +26,23 @@ def main():
 
     try:
         request = json.load(sys.stdin)
-        if not isinstance(request, dict) or not isinstance(request.get("source"), str):
+        if not isinstance(request, dict):
             write_record(protocol_stdout, {
                 "type": "error",
-                "message": "Worker request must be an object with a string 'source'.",
+                "message": "Worker request must be a JSON object.",
+            })
+            return 1
+
+        source = request.get("source")
+        filepath = request.get("filepath")
+        if isinstance(source, str) and filepath is None:
+            mode = "source"
+        elif isinstance(filepath, str) and filepath and source is None:
+            mode = "filepath"
+        else:
+            write_record(protocol_stdout, {
+                "type": "error",
+                "message": "Worker request must contain either a string 'source' or a non-empty string 'filepath'.",
             })
             return 1
 
@@ -38,7 +51,10 @@ def main():
             "type": "line",
             "data": line,
         }))
-        output = wolf.run_for_source(request["source"])
+        if mode == "source":
+            output = wolf.run_for_source(source)
+        else:
+            output = wolf.run(filepath, test=True, remove_file=False)
         write_record(protocol_stdout, {
             "type": "complete",
             "output": output,
