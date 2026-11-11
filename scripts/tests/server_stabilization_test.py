@@ -32,6 +32,10 @@ class LocalServerSecurityTests(unittest.TestCase):
         server_path = os.path.join(os.path.dirname(__file__), "..", "server.py")
         env = os.environ.copy()
         env["WOLF_WORKER_TIMEOUT"] = "3"
+        env["WOLF_MAX_WORKERS"] = "1"
+        env["WOLF_MAX_WORKER_OUTPUT_BYTES"] = "4096"
+        env["WOLF_MAX_WORKER_RECORD_BYTES"] = "1024"
+        env["WOLF_MAX_WORKER_OUTPUT_QUEUE_RECORDS"] = "4"
         cls.process = subprocess.Popen(
             [sys.executable, server_path, "127.0.0.1", str(cls.port), cls.token],
             stdout=subprocess.DEVNULL,
@@ -133,6 +137,66 @@ class LocalServerSecurityTests(unittest.TestCase):
         self.assertEqual(result["statusCode"], 500)
         next_result = run_async(run_normal_trace())
         self.assertEqual(next_result["statusCode"], 200)
+
+    def test_worker_capacity_rejects_excess_trace(self):
+        async def run_concurrent_traces():
+            uri = "ws://127.0.0.1:{}/test".format(self.port)
+            async with websockets.connect(
+                uri,
+                extra_headers={"Authorization": "Bearer " + self.token},
+            ) as first:
+                await first.send(json.dumps({"raw": True, "data": "while True:\n    pass"}))
+                await asyncio.sleep(0.1)
+                async with websockets.connect(
+                    uri,
+                    extra_headers={"Authorization": "Bearer " + self.token},
+                ) as second:
+                    await second.send(json.dumps({"raw": True, "data": "answer = 42  #?"}))
+                    return json.loads(await second.recv())
+
+        result = run_async(run_concurrent_traces())
+        self.assertEqual(result["statusCode"], 503)
+        self.assertIn("worker capacity", result["message"])
+
+        async def wait_for_worker_slot():
+            uri = "ws://127.0.0.1:{}/test".format(self.port)
+            for _ in range(40):
+                async with websockets.connect(
+                    uri,
+                    extra_headers={"Authorization": "Bearer " + self.token},
+                ) as websocket:
+                    await websocket.send(json.dumps({"raw": True, "data": "answer = 42  #?"}))
+                    while True:
+                        response = json.loads(await websocket.recv())
+                        if response.get("eof"):
+                            return response["statusCode"] == 200
+                        if response.get("statusCode", 200) >= 400:
+                            break
+                await asyncio.sleep(0.05)
+            return False
+
+        self.assertTrue(run_async(wait_for_worker_slot()), "worker slot was not released")
+
+    def test_worker_output_limit_stops_excessive_trace_output(self):
+        source = "\n".join(
+            "value_{} = {}  #?".format(index, index)
+            for index in range(100)
+        )
+
+        async def run_trace():
+            uri = "ws://127.0.0.1:{}/test".format(self.port)
+            async with websockets.connect(
+                uri,
+                extra_headers={"Authorization": "Bearer " + self.token},
+            ) as websocket:
+                await websocket.send(json.dumps({"raw": True, "data": source}))
+                while True:
+                    response = json.loads(await websocket.recv())
+                    if response.get("statusCode", 200) >= 400:
+                        return response
+
+        result = run_async(run_trace())
+        self.assertEqual(result["statusCode"], 500)
 
     @unittest.skipIf(os.name == "nt", "PID liveness probing uses POSIX os.kill semantics")
     def test_disconnect_terminates_worker_before_timeout(self):

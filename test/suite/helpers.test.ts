@@ -20,4 +20,18 @@ suite("Helper Tests", () => {
         client.close();
         await assert.rejects(pendingConnection, /closed before connecting/);
     });
+
+    test("routes server error responses to the error event", () => {
+        const client = new WolfClient("127.0.0.1", "9", "error-response-test");
+        let receivedError: Error | undefined;
+        client.on("error", error => receivedError = error);
+
+        (client as any).handleMessage(Buffer.from(JSON.stringify({
+            statusCode: 503,
+            message: "Wolf is at worker capacity; retry shortly",
+        })));
+
+        assert.strictEqual(receivedError?.message, "Wolf is at worker capacity; retry shortly");
+        client.close();
+    });
 });

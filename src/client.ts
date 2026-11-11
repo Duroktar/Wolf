@@ -115,7 +115,14 @@ export class WolfClient {
     try {
       const message = JSON.parse(data.toString())
 
-      if (message.eof) {
+      if (typeof message.statusCode === 'number' && message.statusCode >= 400) {
+        this.emit('error', new Error(
+          typeof message.message === 'string'
+            ? message.message
+            : `Wolf server returned status ${message.statusCode}`
+        ))
+      }
+      else if (message.eof) {
         this.emit('eof', message)
       } else {
         this.emit('data', message)

@@ -34,7 +34,7 @@ export function wolfDecorationStoreFactory(
 export function wolfClientFactory(
   identifier: string = randomString(),
   host = '127.0.0.1',
-  port = '9879',
+  port = process.env.WOLF_SERVER_PORT || '9879',
   authToken?: string,
 ): WolfClient {
   return new WolfClient(host, port, identifier, authToken);
@@ -42,7 +42,7 @@ export function wolfClientFactory(
 
 export function wolfServerDaemonFactory(
   host = '127.0.0.1',
-  port = '9879',
+  port = process.env.WOLF_SERVER_PORT || '9879',
 ): WolfServerDaemon {
   return new WolfServerDaemon(
     host,

@@ -49,13 +49,30 @@ if not wolf_token:
     raise RuntimeError('Wolf server requires an authentication token.')
 
 
-pool = concurrent.futures.ThreadPoolExecutor((os.cpu_count() or 1))
 current_loop = None
 WORKER_TIMEOUT_SECONDS = float(os.environ.get('WOLF_WORKER_TIMEOUT', '30'))
+MAX_WORKERS = max(1, int(os.environ.get(
+    'WOLF_MAX_WORKERS', str(min(os.cpu_count() or 1, 4))
+)))
+MAX_WORKER_OUTPUT_BYTES = max(1024, int(os.environ.get(
+    'WOLF_MAX_WORKER_OUTPUT_BYTES', str(8 * 1024 * 1024)
+)))
+MAX_WORKER_RECORD_BYTES = max(256, min(MAX_WORKER_OUTPUT_BYTES, int(os.environ.get(
+    'WOLF_MAX_WORKER_RECORD_BYTES', str(512 * 1024)
+))))
+MAX_WORKER_OUTPUT_QUEUE_RECORDS = max(1, int(os.environ.get(
+    'WOLF_MAX_WORKER_OUTPUT_QUEUE_RECORDS', '16'
+)))
+pool = concurrent.futures.ThreadPoolExecutor(MAX_WORKERS)
+worker_slots = threading.BoundedSemaphore(MAX_WORKERS)
 
 
 class WorkerCancelled(Exception):
     """Raised when a trace client disconnects before its worker completes."""
+
+
+class WorkerCapacityError(Exception):
+    """Raised when all worker slots are occupied."""
 
 
 def server_log(path: str, message):
@@ -78,6 +95,10 @@ def res_500(path: str):
     return json.dumps({"statusCode": 500, "message": "Internal Server Error", "path": path})
 
 
+def res_503(path: str):
+    return json.dumps({"statusCode": 503, "message": "Wolf is at worker capacity; retry shortly", "path": path})
+
+
 def process_worker_request(loop, websocket, request, path: str, cancellation_event=None):
     worker_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'worker.py')
     process = subprocess.Popen(
@@ -87,14 +108,42 @@ def process_worker_request(loop, websocket, request, path: str, cancellation_eve
         universal_newlines=True,
         bufsize=1,
     )
-    output_lines = queue.Queue()
+    output_lines = queue.Queue(MAX_WORKER_OUTPUT_QUEUE_RECORDS)
+    reader_stop = threading.Event()
+
+    def should_stop_reader():
+        return reader_stop.is_set() or (
+            cancellation_event is not None and cancellation_event.is_set()
+        )
+
+    def queue_output(item):
+        while not should_stop_reader():
+            try:
+                output_lines.put(item, timeout=0.1)
+                return True
+            except queue.Full:
+                continue
+        return False
 
     def read_worker_output():
+        total_bytes = 0
         try:
-            for output_line in process.stdout:
-                output_lines.put(output_line)
+            while True:
+                output_line = process.stdout.readline(MAX_WORKER_RECORD_BYTES + 1)
+                if not output_line:
+                    break
+                record_bytes = len(output_line.encode('utf-8'))
+                if record_bytes > MAX_WORKER_RECORD_BYTES:
+                    queue_output(('limit', 'Worker protocol record exceeded the configured size limit'))
+                    return
+                total_bytes += record_bytes
+                if total_bytes > MAX_WORKER_OUTPUT_BYTES:
+                    queue_output(('limit', 'Worker output exceeded the configured size limit'))
+                    return
+                if not queue_output(('record', output_line)):
+                    return
         finally:
-            output_lines.put(None)
+            queue_output(('eof', None))
 
     reader = threading.Thread(target=read_worker_output)
     reader.daemon = True
@@ -128,11 +177,13 @@ def process_worker_request(loop, websocket, request, path: str, cancellation_eve
             if remaining <= 0:
                 raise subprocess.TimeoutExpired(process.args, WORKER_TIMEOUT_SECONDS)
             try:
-                output_line = output_lines.get(timeout=min(remaining, 0.1))
+                output_type, output_line = output_lines.get(timeout=min(remaining, 0.1))
             except queue.Empty:
                 continue
-            if output_line is None:
+            if output_type == 'eof':
                 break
+            if output_type == 'limit':
+                raise RuntimeError(output_line)
 
             record = json.loads(output_line)
             if record.get('type') == 'line':
@@ -159,6 +210,7 @@ def process_worker_request(loop, websocket, request, path: str, cancellation_eve
             raise RuntimeError('Wolf worker exited without a completion record')
         return completed_output, False
     finally:
+        reader_stop.set()
         if process.poll() is None:
             process.terminate()
             try:
@@ -168,22 +220,35 @@ def process_worker_request(loop, websocket, request, path: str, cancellation_eve
                 process.wait()
         if process.stdin and not process.stdin.closed:
             process.stdin.close()
+        reader.join(timeout=1)
         if process.stdout:
             process.stdout.close()
-        reader.join(timeout=1)
+
+
+def run_admitted_worker_request(loop, websocket, request, path, cancellation_event):
+    try:
+        return process_worker_request(loop, websocket, request, path, cancellation_event)
+    finally:
+        worker_slots.release()
 
 
 async def run_worker_for_websocket(websocket, request, path: str):
+    if not worker_slots.acquire(False):
+        raise WorkerCapacityError('All Wolf worker slots are occupied')
     cancellation_event = threading.Event()
-    worker_future = current_loop.run_in_executor(
-        pool,
-        process_worker_request,
-        current_loop,
-        websocket,
-        request,
-        path,
-        cancellation_event,
-    )
+    try:
+        worker_future = current_loop.run_in_executor(
+            pool,
+            run_admitted_worker_request,
+            current_loop,
+            websocket,
+            request,
+            path,
+            cancellation_event,
+        )
+    except BaseException:
+        worker_slots.release()
+        raise
     closed_future = asyncio.ensure_future(websocket.wait_closed())
     done, _ = await asyncio.wait(
         [worker_future, closed_future],
@@ -259,6 +324,12 @@ async def handler(websocket, path: str = ""):
         server_log(path, "Client Disconnected")
     except websockets.exceptions.WebSocketException as e:
         server_log(path, f"SOCKET ERROR: {e}")
+    except WorkerCapacityError as e:
+        server_log(path, str(e))
+        try:
+            await websocket.send(res_503(path))
+        except Exception:
+            pass
     except Exception as e:
         server_log(path, f"SERVER ERROR: {e}")
         try:

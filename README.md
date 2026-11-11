@@ -94,9 +94,15 @@ exploration tool, not a sandbox. Each trace runs in a short-lived worker
 process with a 30-second execution limit by default; set
 `WOLF_WORKER_TIMEOUT` to change that limit in seconds. The worker still has the
 same user permissions as the extension, so process isolation does not make
-untrusted code safe. The tracing server binds to localhost by default, requires
-a per-extension authentication token, and rejects browser origins. Do not run
-Wolf on untrusted code. Overriding
+untrusted code safe. The server runs at most four workers by default and
+rejects additional traces while all worker slots are occupied; set
+`WOLF_MAX_WORKERS` to change this limit. Worker protocol output is limited to 8
+MiB per trace and 512 KiB per record by default; these limits can be changed
+with `WOLF_MAX_WORKER_OUTPUT_BYTES` and `WOLF_MAX_WORKER_RECORD_BYTES`. The
+number of buffered protocol records is also bounded by
+`WOLF_MAX_WORKER_OUTPUT_QUEUE_RECORDS` (default 16). The tracing server binds
+to localhost by default, requires a per-extension authentication token, and
+rejects browser origins. Do not run Wolf on untrusted code. Overriding
 `WOLF_SERVER_INTERFACE` can expose the server to other machines and should be
 done only with an appropriate network security boundary.
 
